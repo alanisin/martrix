@@ -6,18 +6,16 @@
     <title>Gestor de Proyectos Digitales</title>
     <!-- Incluir Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Incluir React y Babel para transpilar JSX en el navegador -->
+    <!-- Incluir React y ReactDOM -->
     <script src="https://unpkg.com/react@17/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- NOTA: El script de Babel (@babel/standalone) ha sido eliminado. Ya no es necesario. -->
     <style>
-        /* Estilos adicionales si fueran necesarios */
         body {
             font-family: 'Inter', sans-serif;
         }
-        /* Configuración para el modo oscuro de Tailwind */
         .dark .bg-black {
-             background-color: #121212; /* Un negro menos intenso para el fondo */
+             background-color: #121212;
         }
     </style>
      <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -28,11 +26,11 @@
 
     <div id="root"></div>
 
-    <script type="text/babel">
+    <!-- El tipo de script ahora es "text/javascript" porque el código es JavaScript puro -->
+    <script type="text/javascript">
         const { useState, useEffect, useCallback, useMemo } = React;
 
         // --- DATOS INICIALES DEL PROYECTO ---
-        // Estos son los datos base para un nuevo proyecto si no hay nada guardado.
         const initialProjectData = [
             {
                 id: 1,
@@ -177,33 +175,35 @@
             }
         ].map(category => ({ ...category, isOpen: category.id === 1 }));
 
-        // --- COMPONENTES ---
+        // --- COMPONENTES (Ahora usando React.createElement) ---
 
-        const ProgressBar = ({ progress }) => (
-            <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
-                <div
-                    className="bg-blue-600 h-2.5 rounded-full transition-all duration-500 ease-out"
-                    style={{ width: `${progress}%` }}
-                ></div>
-            </div>
-        );
+        const e = React.createElement;
 
-        const CheckpointItem = ({ checkpoint, onToggle }) => (
-            <li
-                className="flex items-start p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors duration-200 cursor-pointer"
-                onClick={onToggle}
-            >
-                <input
-                    type="checkbox"
-                    checked={checkpoint.completed}
-                    onChange={onToggle}
-                    className="w-5 h-5 mt-0.5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600 cursor-pointer"
-                />
-                <label className={`ml-3 text-sm font-medium ${checkpoint.completed ? 'text-gray-500 dark:text-gray-400 line-through' : 'text-gray-900 dark:text-gray-200'} transition-colors duration-200`}>
-                    {checkpoint.text}
-                </label>
-            </li>
-        );
+        const ProgressBar = ({ progress }) => {
+            return e('div', { className: 'w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700' },
+                e('div', {
+                    className: 'bg-blue-600 h-2.5 rounded-full transition-all duration-500 ease-out',
+                    style: { width: `${progress}%` }
+                })
+            );
+        };
+
+        const CheckpointItem = ({ checkpoint, onToggle }) => {
+            return e('li', {
+                className: 'flex items-start p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors duration-200 cursor-pointer',
+                onClick: onToggle
+            },
+                e('input', {
+                    type: 'checkbox',
+                    checked: checkpoint.completed,
+                    onChange: onToggle,
+                    className: 'w-5 h-5 mt-0.5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600 cursor-pointer'
+                }),
+                e('label', {
+                    className: `ml-3 text-sm font-medium ${checkpoint.completed ? 'text-gray-500 dark:text-gray-400 line-through' : 'text-gray-900 dark:text-gray-200'} transition-colors duration-200`
+                }, checkpoint.text)
+            );
+        };
 
         const Category = ({ category, onToggleCheckpoint, onToggleCategory }) => {
             const progress = useMemo(() => {
@@ -211,46 +211,46 @@
                 return (completedCount / category.checkpoints.length) * 100;
             }, [category.checkpoints]);
 
-            return (
-                <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden mb-4 shadow-sm">
-                    <button
-                        onClick={onToggleCategory}
-                        className="w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
-                    >
-                        <div className="flex items-center text-left">
-                            <span className="text-xl mr-3">{category.icon}</span>
-                            <h3 className="font-semibold text-lg text-gray-900 dark:text-white">{category.title}</h3>
-                        </div>
-                        <div className="flex items-center">
-                            <span className="text-sm font-bold text-blue-700 dark:text-blue-400 mr-4">{Math.round(progress)}%</span>
-                            <svg className={`w-6 h-6 text-gray-600 dark:text-gray-400 transform transition-transform duration-300 ${category.isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-                        </div>
-                    </button>
-                    {category.isOpen && (
-                        <div className="p-4 bg-white dark:bg-gray-900">
-                            <ProgressBar progress={progress} />
-                            <ul className="mt-4 space-y-1">
-                                {category.checkpoints.map(checkpoint => (
-                                    <CheckpointItem
-                                        key={checkpoint.id}
-                                        checkpoint={checkpoint}
-                                        onToggle={() => onToggleCheckpoint(category.id, checkpoint.id)}
-                                    />
-                                ))}
-                            </ul>
-                        </div>
-                    )}
-                </div>
+            const header = e('button', {
+                onClick: onToggleCategory,
+                className: 'w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200'
+            },
+                e('div', { className: 'flex items-center text-left' },
+                    e('span', { className: 'text-xl mr-3' }, category.icon),
+                    e('h3', { className: 'font-semibold text-lg text-gray-900 dark:text-white' }, category.title)
+                ),
+                e('div', { className: 'flex items-center' },
+                    e('span', { className: 'text-sm font-bold text-blue-700 dark:text-blue-400 mr-4' }, `${Math.round(progress)}%`),
+                    e('svg', { className: `w-6 h-6 text-gray-600 dark:text-gray-400 transform transition-transform duration-300 ${category.isOpen ? 'rotate-180' : ''}`, fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24', xmlns: 'http://www.w3.org/2000/svg' },
+                        e('path', { strokeLinecap: 'round', strokeLinejoin: 'round', strokeWidth: '2', d: 'M19 9l-7 7-7-7' })
+                    )
+                )
+            );
+
+            const content = category.isOpen && e('div', { className: 'p-4 bg-white dark:bg-gray-900' },
+                e(ProgressBar, { progress: progress }),
+                e('ul', { className: 'mt-4 space-y-1' },
+                    ...category.checkpoints.map(checkpoint =>
+                        e(CheckpointItem, {
+                            key: checkpoint.id,
+                            checkpoint: checkpoint,
+                            onToggle: () => onToggleCheckpoint(category.id, checkpoint.id)
+                        })
+                    )
+                )
+            );
+
+            return e('div', { className: 'border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden mb-4 shadow-sm' },
+                header,
+                content
             );
         };
 
-        // --- COMPONENTE PRINCIPAL DE LA APLICACIÓN ---
         function App() {
             const [projectData, setProjectData] = useState([]);
             const [isLoading, setIsLoading] = useState(true);
             const storageKey = 'digitalProjectManagerData';
 
-            // Cargar datos desde localStorage al iniciar la aplicación
             useEffect(() => {
                 try {
                     const savedData = localStorage.getItem(storageKey);
@@ -266,7 +266,6 @@
                 setIsLoading(false);
             }, []);
 
-            // Guardar datos en localStorage cada vez que projectData cambie
             useEffect(() => {
                 if (!isLoading) {
                     try {
@@ -279,19 +278,11 @@
 
             const handleToggleCheckpoint = useCallback((categoryId, checkpointId) => {
                 setProjectData(currentData =>
-                    currentData.map(category => {
-                        if (category.id === categoryId) {
-                            return {
-                                ...category,
-                                checkpoints: category.checkpoints.map(checkpoint =>
-                                    checkpoint.id === checkpointId
-                                        ? { ...checkpoint, completed: !checkpoint.completed }
-                                        : checkpoint
-                                ),
-                            };
-                        }
-                        return category;
-                    })
+                    currentData.map(category =>
+                        category.id === categoryId ? { ...category, checkpoints: category.checkpoints.map(checkpoint =>
+                            checkpoint.id === checkpointId ? { ...checkpoint, completed: !checkpoint.completed } : checkpoint)
+                        } : category
+                    )
                 );
             }, []);
 
@@ -312,52 +303,45 @@
             }, [projectData]);
 
             if (isLoading) {
-                return (
-                    <div className="flex items-center justify-center h-screen bg-gray-100 dark:bg-gray-900">
-                        <div className="text-center">
-                            <svg className="mx-auto h-12 w-12 text-blue-500 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            <p className="mt-4 text-lg font-semibold text-gray-700 dark:text-gray-300">Cargando proyecto...</p>
-                        </div>
-                    </div>
+                return e('div', { className: 'flex items-center justify-center h-screen bg-gray-100 dark:bg-gray-900' },
+                    e('div', { className: 'text-center' },
+                        e('svg', { className: 'mx-auto h-12 w-12 text-blue-500 animate-spin', xmlns: 'http://www.w3.org/2000/svg', fill: 'none', viewBox: '0 0 24 24' },
+                            e('circle', { className: 'opacity-25', cx: '12', cy: '12', r: '10', stroke: 'currentColor', strokeWidth: '4' }),
+                            e('path', { className: 'opacity-75', fill: 'currentColor', d: 'M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z' })
+                        ),
+                        e('p', { className: 'mt-4 text-lg font-semibold text-gray-700 dark:text-gray-300' }, 'Cargando proyecto...')
+                    )
                 );
             }
 
-            return (
-                <div className="bg-gray-100 dark:bg-black min-h-screen font-sans">
-                    <div className="container mx-auto p-4 sm:p-6 md:p-8">
-                        <header className="mb-8 p-6 bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700">
-                            <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-2">Gestor de Proyectos Digitales</h1>
-                            <p className="text-md text-gray-600 dark:text-gray-400 mb-4">Sigue el avance de tu proyecto de digitalización paso a paso.</p>
-                            <div className="flex items-center">
-                                <span className="text-lg font-bold text-blue-700 dark:text-blue-400 mr-3">{Math.round(overallProgress)}%</span>
-                                <ProgressBar progress={overallProgress} />
-                            </div>
-                        </header>
-
-                        <main>
-                            {projectData.map(category => (
-                                <Category
-                                    key={category.id}
-                                    category={category}
-                                    onToggleCheckpoint={handleToggleCheckpoint}
-                                    onToggleCategory={() => handleToggleCategory(category.id)}
-                                />
-                            ))}
-                        </main>
-                         <footer className="text-center mt-8">
-                            <p className="text-xs text-gray-500 dark:text-gray-400">
-                                Los datos se guardan localmente en tu navegador.
-                            </p>
-                         </footer>
-                    </div>
-                </div>
+            return e('div', { className: 'bg-gray-100 dark:bg-black min-h-screen font-sans' },
+                e('div', { className: 'container mx-auto p-4 sm:p-6 md:p-8' },
+                    e('header', { className: 'mb-8 p-6 bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700' },
+                        e('h1', { className: 'text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-2' }, 'Gestor de Proyectos Digitales'),
+                        e('p', { className: 'text-md text-gray-600 dark:text-gray-400 mb-4' }, 'Sigue el avance de tu proyecto de digitalización paso a paso.'),
+                        e('div', { className: 'flex items-center' },
+                            e('span', { className: 'text-lg font-bold text-blue-700 dark:text-blue-400 mr-3' }, `${Math.round(overallProgress)}%`),
+                            e(ProgressBar, { progress: overallProgress })
+                        )
+                    ),
+                    e('main', null,
+                        ...projectData.map(category =>
+                            e(Category, {
+                                key: category.id,
+                                category: category,
+                                onToggleCheckpoint: handleToggleCheckpoint,
+                                onToggleCategory: () => handleToggleCategory(category.id)
+                            })
+                        )
+                    ),
+                    e('footer', { className: 'text-center mt-8' },
+                        e('p', { className: 'text-xs text-gray-500 dark:text-gray-400' }, 'Los datos se guardan localmente en tu navegador.')
+                    )
+                )
             );
         }
 
-        ReactDOM.render(<App />, document.getElementById('root'));
+        ReactDOM.render(e(App), document.getElementById('root'));
     </script>
 </body>
 </html>
