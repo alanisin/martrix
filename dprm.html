@@ -3,341 +3,308 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestor de Proyectos Digitales</title>
+    <title>Digital Project Management Tool</title>
     <!-- Incluir Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Incluir React y ReactDOM -->
     <script src="https://unpkg.com/react@17/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
-    <!-- NOTA: El script de Babel (@babel/standalone) ha sido eliminado. Ya no es necesario. -->
+    <!-- Librerías para exportar a PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
+            background-color: #f9fafb; /* Fondo base para modo claro */
         }
-        .dark .bg-black {
-             background-color: #121212;
+        .dark body {
+            background-color: #0d1117; /* Fondo base para modo oscuro */
+        }
+        .project-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+        }
+        .modal-backdrop {
+            transition: opacity 0.3s ease-in-out;
+        }
+        .modal-content {
+            transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
+        }
+        /* Estilo para el scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        .dark ::-webkit-scrollbar-track {
+            background: #2d3748;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 10px;
+        }
+        .dark ::-webkit-scrollbar-thumb {
+            background: #4a5568;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+        .dark ::-webkit-scrollbar-thumb:hover {
+            background: #718096;
         }
     </style>
      <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
-<body class="bg-gray-100 dark:bg-black">
+<body class="antialiased text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-gray-900">
 
     <div id="root"></div>
 
-    <!-- El tipo de script ahora es "text/javascript" porque el código es JavaScript puro -->
     <script type="text/javascript">
         const { useState, useEffect, useCallback, useMemo } = React;
-
-        // --- DATOS INICIALES DEL PROYECTO ---
-        const initialProjectData = [
-            {
-                id: 1,
-                icon: '🔍',
-                title: '1. Diagnóstico y Evaluación Inicial',
-                checkpoints: [
-                    { id: 101, text: 'Identificar procesos clave que pueden digitalizarse (tareas repetitivas, manuales o críticas).', completed: false },
-                    { id: 102, text: 'Mapear los flujos actuales ("As-Is") para entender cómo se ejecutan hoy las tareas.', completed: false },
-                    { id: 103, text: 'Evaluar el nivel de madurez digital de la organización o del equipo involucrado.', completed: false },
-                    { id: 104, text: 'Involucrar a los actores clave de cada área (operativos, líderes y stakeholders).', completed: false },
-                    { id: 105, text: 'Detectar fricciones, errores o cuellos de botella en los procesos actuales.', completed: false },
-                    { id: 106, text: 'Analizar tecnologías existentes y entender sus limitaciones o integraciones actuales.', completed: false },
-                    { id: 107, text: 'Recolectar datos y evidencias reales (tiempos, costos, errores, volumen de trabajo).', completed: false },
-                    { id: 108, text: 'Establecer una línea base desde donde se medirá la mejora (benchmark interno).', completed: false },
-                ],
-            },
-            {
-                id: 2,
-                icon: '🎯',
-                title: '2. Definición de Objetivos y Alcance',
-                checkpoints: [
-                    { id: 201, text: 'Establecer objetivos SMART (Específicos, Medibles, Alcanzables, Relevantes y con Tiempo definido).', completed: false },
-                    { id: 202, text: 'Definir el alcance del proyecto, es decir, qué procesos o áreas se incluirán y cuáles no.', completed: false },
-                    { id: 203, text: 'Alinear los objetivos con la estrategia del negocio (eficiencia, crecimiento, experiencia del cliente, etc.).', completed: false },
-                    { id: 204, text: 'Identificar restricciones (presupuesto, tiempo, recursos humanos, tecnología disponible).', completed: false },
-                    { id: 205, text: 'Asignar responsables claros para cada fase o entregable del proyecto.', completed: false },
-                    { id: 206, text: 'Establecer entregables concretos para cada etapa del proyecto.', completed: false },
-                    { id: 207, text: 'Priorizar procesos según impacto y viabilidad, utilizando por ejemplo la matriz Esfuerzo-Impacto.', completed: false },
-                    { id: 208, text: 'Establecer criterios de éxito: ¿Cómo sabremos que el proyecto fue exitoso?', completed: false },
-                ],
-            },
-            {
-                id: 3,
-                icon: '⚙️',
-                title: '3. Selección de Herramientas y Tecnologías',
-                checkpoints: [
-                    { id: 301, text: 'Investigar opciones tecnológicas disponibles (software, plataformas, APIs, apps low-code/no-code, etc.).', completed: false },
-                    { id: 302, text: 'Evaluar cada herramienta según criterios clave: Costo total, Facilidad de uso, Compatibilidad, Seguridad.', completed: false },
-                    { id: 303, text: 'Probar herramientas en entornos demo o versiones gratuitas antes de comprometer inversión.', completed: false },
-                    { id: 304, text: 'Consultar con el equipo técnico o proveedor de TI sobre implicaciones e infraestructura necesaria.', completed: false },
-                    { id: 305, text: 'Seleccionar herramientas que escalen con el proyecto, es decir, que puedan crecer conforme crece el uso.', completed: false },
-                    { id: 306, text: 'Considerar soluciones que empoderen al usuario final (no depender siempre del área de sistemas).', completed: false },
-                    { id: 307, text: 'Verificar si ya hay herramientas internas subutilizadas que puedan adaptarse al proyecto.', completed: false },
-                    { id: 308, text: 'Documentar las razones de elección para justificar la decisión frente a stakeholders.', completed: false },
-                ],
-            },
-            {
-                id: 4,
-                icon: '🧩',
-                title: '4. Diseño del Proceso Digital (To-Be)',
-                checkpoints: [
-                    { id: 401, text: 'Modelar el flujo futuro del proceso (To-Be) usando diagramas de flujo, BPMN o herramientas visuales.', completed: false },
-                    { id: 402, text: 'Simplificar y optimizar el proceso antes de digitalizarlo, eliminando pasos innecesarios.', completed: false },
-                    { id: 403, text: 'Definir claramente las tareas automatizadas vs. las tareas humanas.', completed: false },
-                    { id: 404, text: 'Establecer roles y responsables dentro del nuevo flujo digital.', completed: false },
-                    { id: 405, text: 'Diseñar formularios, interfaces o entradas de datos necesarias para operar el proceso.', completed: false },
-                    { id: 406, text: 'Incluir reglas de negocio clave (validaciones, condiciones, cálculos, aprobaciones, etc.).', completed: false },
-                    { id: 407, text: 'Planear alertas, notificaciones o reportes automáticos que acompañen el proceso.', completed: false },
-                    { id: 408, text: 'Asegurar trazabilidad: que todo paso deje evidencia digital o log (para auditoría y mejora continua).', completed: false },
-                    { id: 409, text: 'Anticipar excepciones y errores comunes y cómo deben manejarse digitalmente.', completed: false },
-                ],
-            },
-            {
-                id: 5,
-                icon: '🔧',
-                title: '5. Desarrollo y Configuración',
-                checkpoints: [
-                    { id: 501, text: 'Configurar o desarrollar la solución digital según el diseño del proceso To-Be.', completed: false },
-                    { id: 502, text: 'Construir formularios, automatizaciones, interfaces y dashboards dentro de la herramienta elegida.', completed: false },
-                    { id: 503, text: 'Integrar bases de datos o fuentes de información externas, si el proceso lo requiere.', completed: false },
-                    { id: 504, text: 'Conectar con otros sistemas o herramientas existentes (ej. CRM, ERP, correo, SharePoint, etc.).', completed: false },
-                    { id: 505, text: 'Aplicar buenas prácticas de desarrollo: modularidad, limpieza visual, nombres coherentes, reutilización.', completed: false },
-                    { id: 506, text: 'Configurar reglas de seguridad y permisos de usuario, para definir quién puede ver, editar o aprobar.', completed: false },
-                    { id: 507, text: 'Crear respaldos periódicos y sistemas de recuperación ante fallos.', completed: false },
-                    { id: 508, text: 'Probar cada componente del sistema de forma individual antes de realizar pruebas completas.', completed: false },
-                    { id: 509, text: 'Documentar todo el desarrollo (estructura, lógica, accesos y decisiones tomadas).', completed: false },
-                ],
-            },
-            {
-                id: 6,
-                icon: '🧪',
-                title: '6. Prueba Piloto',
-                checkpoints: [
-                    { id: 601, text: 'Seleccionar un grupo reducido de usuarios reales para hacer la prueba (usuarios clave o representantes del flujo).', completed: false },
-                    { id: 602, text: 'Ejecutar el proceso digital en un entorno controlado, simulando escenarios reales.', completed: false },
-                    { id: 603, text: 'Medir desempeño del sistema: tiempos de respuesta, exactitud, errores, fricciones.', completed: false },
-                    { id: 604, text: 'Observar la experiencia del usuario final: ¿Entiende? ¿Comete errores? ¿Se siente cómodo?', completed: false },
-                    { id: 605, text: 'Recolectar feedback estructurado (entrevistas, encuestas o sesiones grabadas).', completed: false },
-                    { id: 606, text: 'Registrar errores o bugs, tanto técnicos como funcionales.', completed: false },
-                    { id: 607, text: 'Documentar hallazgos y oportunidades de mejora antes del despliegue general.', completed: false },
-                    { id: 608, text: 'Ajustar el sistema según los resultados: mejorar formularios, automatizaciones, nomenclaturas o flujos.', completed: false },
-                    { id: 609, text: 'Validar cumplimiento de los criterios de éxito definidos en las etapas previas.', completed: false },
-                ],
-            },
-            {
-                id: 7,
-                icon: '🚀',
-                title: '7. Implementación General',
-                checkpoints: [
-                    { id: 701, text: 'Lanzar oficialmente el proceso digitalizado en todo el equipo o área definida.', completed: false },
-                    { id: 702, text: 'Capacitar a todos los usuarios finales, con enfoque práctico y adaptado a su nivel.', completed: false },
-                    { id: 703, text: 'Entregar materiales de apoyo: manuales, tutoriales, videos cortos, preguntas frecuentes.', completed: false },
-                    { id: 704, text: 'Establecer canales de soporte técnico y funcional, para resolver dudas o incidencias rápidamente.', completed: false },
-                    { id: 705, text: 'Designar responsables de seguimiento durante los primeros días o semanas del uso real.', completed: false },
-                    { id: 706, text: 'Monitorear el uso del sistema en tiempo real, para detectar caídas o errores tempranos.', completed: false },
-                    { id: 707, text: 'Aplicar ajustes rápidos (hotfixes) si surgen bloqueos críticos en la operación.', completed: false },
-                    { id: 708, text: 'Acompañar emocionalmente el cambio: resolver temores, dudas o resistencias con empatía.', completed: false },
-                    { id: 709, text: 'Comunicar logros y beneficios iniciales, reforzando el valor del cambio para todos los involucrados.', completed: false },
-                ],
-            },
-            {
-                id: 8,
-                icon: '📊',
-                title: '8. Medición y Mejora Continua',
-                checkpoints: [
-                    { id: 801, text: 'Definir indicadores clave (KPIs) que midan el éxito del proceso digital (ej. tiempo de ejecución, tasa de error, satisfacción del usuario, ahorro en costos).', completed: false },
-                    { id: 802, text: 'Recolectar datos en tiempo real sobre el uso y desempeño del sistema.', completed: false },
-                    { id: 803, text: 'Comparar resultados con la línea base establecida en la etapa de diagnóstico.', completed: false },
-                    { id: 804, text: 'Analizar el impacto real del cambio: ¿se logró lo esperado? ¿Qué mejoró? ¿Qué no?', completed: false },
-                    { id: 805, text: 'Obtener feedback constante de los usuarios, incluso después del lanzamiento (buzón digital, encuestas, entrevistas).', completed: false },
-                    { id: 806, text: 'Priorizar ajustes o nuevas funcionalidades con base en datos y necesidades reales.', completed: false },
-                    { id: 807, text: 'Implementar ciclos de mejora continua (Kaizen, PDCA, o iteraciones ágiles).', completed: false },
-                    { id: 808, text: 'Comunicar los resultados y aprendizajes al equipo y stakeholders.', completed: false },
-                    { id: 809, text: 'Planificar nuevas fases de digitalización, si aplica (escalado a más procesos o áreas).', completed: false },
-                ],
-            },
-            {
-                id: 9,
-                icon: '❤️‍🔥',
-                title: '9. Gestión del Cambio Cultural (Transversal)',
-                checkpoints: [
-                    { id: 901, text: 'Comunicar el propósito del proyecto desde el inicio, no solo el “qué” se hace, sino el “por qué”.', completed: false },
-                    { id: 902, text: 'Involucrar a líderes y embajadores del cambio que inspiren y apoyen al resto del equipo.', completed: false },
-                    { id: 903, text: 'Anticipar resistencias emocionales o culturales, y abordarlas con empatía, no con imposición.', completed: false },
-                    { id: 904, text: 'Generar confianza y participación, invitando a los equipos a co-crear soluciones.', completed: false },
-                    { id: 905, text: 'Reforzar continuamente los beneficios del cambio, con ejemplos reales y casos de éxito.', completed: false },
-                    { id: 906, text: 'Celebrar pequeños logros y victorias tempranas, para mantener la motivación.', completed: false },
-                    { id: 907, text: 'Capacitar en habilidades digitales y mindset ágil, no solo en herramientas técnicas.', completed: false },
-                    { id: 908, text: 'Reconocer públicamente a quienes se adaptan rápido, creando una cultura de evolución positiva.', completed: false },
-                    { id: 909, text: 'Construir una narrativa de transformación, donde cada persona se vea como parte fundamental del cambio.', completed: false },
-                ],
-            }
-        ].map(category => ({ ...category, isOpen: category.id === 1 }));
-
-        // --- COMPONENTES (Ahora usando React.createElement) ---
-
         const e = React.createElement;
 
-        const ProgressBar = ({ progress }) => {
-            return e('div', { className: 'w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700' },
-                e('div', {
-                    className: 'bg-blue-600 h-2.5 rounded-full transition-all duration-500 ease-out',
-                    style: { width: `${progress}%` }
-                })
-            );
+        // --- DATOS INICIALES DEL PROYECTO (Plantilla para proyectos nuevos con campo de comentario) ---
+        const getInitialProjectData = () => ([
+            { id: 1, icon: '🔍', title: '1. Diagnóstico y Evaluación Inicial', checkpoints: [ { id: 101, text: 'Identificar procesos clave que pueden digitalizarse (tareas repetitivas, manuales o críticas).', completed: false, comment: '' }, { id: 102, text: 'Mapear los flujos actuales ("As-Is") para entender cómo se ejecutan hoy las tareas.', completed: false, comment: '' }, { id: 103, text: 'Evaluar el nivel de madurez digital de la organización o del equipo involucrado.', completed: false, comment: '' }, { id: 104, text: 'Involucrar a los actores clave de cada área (operativos, líderes y stakeholders).', completed: false, comment: '' }, { id: 105, text: 'Detectar fricciones, errores o cuellos de botella en los procesos actuales.', completed: false, comment: '' }, { id: 106, text: 'Analizar tecnologías existentes y entender sus limitaciones o integraciones actuales.', completed: false, comment: '' }, { id: 107, text: 'Recolectar datos y evidencias reales (tiempos, costos, errores, volumen de trabajo).', completed: false, comment: '' }, { id: 108, text: 'Establecer una línea base desde donde se medirá la mejora (benchmark interno).', completed: false, comment: '' } ], isOpen: true },
+            { id: 2, icon: '🎯', title: '2. Definición de Objetivos y Alcance', checkpoints: [ { id: 201, text: 'Establecer objetivos SMART (Específicos, Medibles, Alcanzables, Relevantes y con Tiempo definido).', completed: false, comment: '' }, { id: 202, text: 'Definir el alcance del proyecto, es decir, qué procesos o áreas se incluirán y cuáles no.', completed: false, comment: '' }, { id: 203, text: 'Alinear los objetivos con la estrategia del negocio (eficiencia, crecimiento, experiencia del cliente, etc.).', completed: false, comment: '' }, { id: 204, text: 'Identificar restricciones (presupuesto, tiempo, recursos humanos, tecnología disponible).', completed: false, comment: '' }, { id: 205, text: 'Asignar responsables claros para cada fase o entregable del proyecto.', completed: false, comment: '' }, { id: 206, text: 'Establecer entregables concretos para cada etapa del proyecto.', completed: false, comment: '' }, { id: 207, text: 'Priorizar procesos según impacto y viabilidad, utilizando por ejemplo la matriz Esfuerzo-Impacto.', completed: false, comment: '' }, { id: 208, text: 'Establecer criterios de éxito: ¿Cómo sabremos que el proyecto fue exitoso?', completed: false, comment: '' } ], isOpen: false },
+            { id: 3, icon: '⚙️', title: '3. Selección de Herramientas y Tecnologías', checkpoints: [ { id: 301, text: 'Investigar opciones tecnológicas disponibles (software, plataformas, APIs, apps low-code/no-code, etc.).', completed: false, comment: '' }, { id: 302, text: 'Evaluar cada herramienta según criterios clave: Costo total, Facilidad de uso, Compatibilidad, Seguridad.', completed: false, comment: '' }, { id: 303, text: 'Probar herramientas en entornos demo o versiones gratuitas antes de comprometer inversión.', completed: false, comment: '' }, { id: 304, text: 'Consultar con el equipo técnico o proveedor de TI sobre implicaciones e infraestructura necesaria.', completed: false, comment: '' }, { id: 305, text: 'Seleccionar herramientas que escalen con el proyecto, es decir, que puedan crecer conforme crece el uso.', completed: false, comment: '' }, { id: 306, text: 'Considerar soluciones que empoderen al usuario final (no depender siempre del área de sistemas).', completed: false, comment: '' }, { id: 307, text: 'Verificar si ya hay herramientas internas subutilizadas que puedan adaptarse al proyecto.', completed: false, comment: '' }, { id: 308, text: 'Documentar las razones de elección para justificar la decisión frente a stakeholders.', completed: false, comment: '' } ], isOpen: false },
+            { id: 4, icon: '🧩', title: '4. Diseño del Proceso Digital (To-Be)', checkpoints: [ { id: 401, text: 'Modelar el flujo futuro del proceso (To-Be) usando diagramas de flujo, BPMN o herramientas visuales.', completed: false, comment: '' }, { id: 402, text: 'Simplificar y optimizar el proceso antes de digitalizarlo, eliminando pasos innecesarios.', completed: false, comment: '' }, { id: 403, text: 'Definir claramente las tareas automatizadas vs. las tareas humanas.', completed: false, comment: '' }, { id: 404, text: 'Establecer roles y responsables dentro del nuevo flujo digital.', completed: false, comment: '' }, { id: 405, text: 'Diseñar formularios, interfaces o entradas de datos necesarias para operar el proceso.', completed: false, comment: '' }, { id: 406, text: 'Incluir reglas de negocio clave (validaciones, condiciones, cálculos, aprobaciones, etc.).', completed: false, comment: '' }, { id: 407, text: 'Planear alertas, notificaciones o reportes automáticos que acompañen el proceso.', completed: false, comment: '' }, { id: 408, text: 'Asegurar trazabilidad: que todo paso deje evidencia digital o log (para auditoría y mejora continua).', completed: false, comment: '' }, { id: 409, text: 'Anticipar excepciones y errores comunes y cómo deben manejarse digitalmente.', completed: false, comment: '' } ], isOpen: false },
+            { id: 5, icon: '🔧', title: '5. Desarrollo y Configuración', checkpoints: [ { id: 501, text: 'Configurar o desarrollar la solución digital según el diseño del proceso To-Be.', completed: false, comment: '' }, { id: 502, text: 'Construir formularios, automatizaciones, interfaces y dashboards dentro de la herramienta elegida.', completed: false, comment: '' }, { id: 503, text: 'Integrar bases de datos o fuentes de información externas, si el proceso lo requiere.', completed: false, comment: '' }, { id: 504, text: 'Conectar con otros sistemas o herramientas existentes (ej. CRM, ERP, correo, SharePoint, etc.).', completed: false, comment: '' }, { id: 505, text: 'Aplicar buenas prácticas de desarrollo: modularidad, limpieza visual, nombres coherentes, reutilización.', completed: false, comment: '' }, { id: 506, text: 'Configurar reglas de seguridad y permisos de usuario, para definir quién puede ver, editar o aprobar.', completed: false, comment: '' }, { id: 507, text: 'Crear respaldos periódicos y sistemas de recuperación ante fallos.', completed: false, comment: '' }, { id: 508, text: 'Probar cada componente del sistema de forma individual antes de realizar pruebas completas.', completed: false, comment: '' }, { id: 509, text: 'Documentar todo el desarrollo (estructura, lógica, accesos y decisiones tomadas).', completed: false, comment: '' } ], isOpen: false },
+            { id: 6, icon: '🧪', title: '6. Prueba Piloto', checkpoints: [ { id: 601, text: 'Seleccionar un grupo reducido de usuarios reales para hacer la prueba (usuarios clave o representantes del flujo).', completed: false, comment: '' }, { id: 602, text: 'Ejecutar el proceso digital en un entorno controlado, simulando escenarios reales.', completed: false, comment: '' }, { id: 603, text: 'Medir desempeño del sistema: tiempos de respuesta, exactitud, errores, fricciones.', completed: false, comment: '' }, { id: 604, text: 'Observar la experiencia del usuario final: ¿Entiende? ¿Comete errores? ¿Se siente cómodo?', completed: false, comment: '' }, { id: 605, text: 'Recolectar feedback estructurado (entrevistas, encuestas o sesiones grabadas).', completed: false, comment: '' }, { id: 606, text: 'Registrar errores o bugs, tanto técnicos como funcionales.', completed: false, comment: '' }, { id: 607, text: 'Documentar hallazgos y oportunidades de mejora antes del despliegue general.', completed: false, comment: '' }, { id: 608, text: 'Ajustar el sistema según los resultados: mejorar formularios, automatizaciones, nomenclaturas o flujos.', completed: false, comment: '' }, { id: 609, text: 'Validar cumplimiento de los criterios de éxito definidos en las etapas previas.', completed: false, comment: '' } ], isOpen: false },
+            { id: 7, icon: '🚀', title: '7. Implementación General', checkpoints: [ { id: 701, text: 'Lanzar oficialmente el proceso digitalizado en todo el equipo o área definida.', completed: false, comment: '' }, { id: 702, text: 'Capacitar a todos los usuarios finales, con enfoque práctico y adaptado a su nivel.', completed: false, comment: '' }, { id: 703, text: 'Entregar materiales de apoyo: manuales, tutoriales, videos cortos, preguntas frecuentes.', completed: false, comment: '' }, { id: 704, text: 'Establecer canales de soporte técnico y funcional, para resolver dudas o incidencias rápidamente.', completed: false, comment: '' }, { id: 705, text: 'Designar responsables de seguimiento durante los primeros días o semanas del uso real.', completed: false, comment: '' }, { id: 706, text: 'Monitorear el uso del sistema en tiempo real, para detectar caídas o errores tempranos.', completed: false, comment: '' }, { id: 707, text: 'Aplicar ajustes rápidos (hotfixes) si surgen bloqueos críticos en la operación.', completed: false, comment: '' }, { id: 708, text: 'Acompañar emocionalmente el cambio: resolver temores, dudas o resistencias con empatía.', completed: false, comment: '' }, { id: 709, text: 'Comunicar logros y beneficios iniciales, reforzando el valor del cambio para todos los involucrados.', completed: false, comment: '' } ], isOpen: false },
+            { id: 8, icon: '📊', title: '8. Medición y Mejora Continua', checkpoints: [ { id: 801, text: 'Definir indicadores clave (KPIs) que midan el éxito del proceso digital (ej. tiempo de ejecución, tasa de error, satisfacción del usuario, ahorro en costos).', completed: false, comment: '' }, { id: 802, text: 'Recolectar datos en tiempo real sobre el uso y desempeño del sistema.', completed: false, comment: '' }, { id: 803, text: 'Comparar resultados con la línea base establecida en la etapa de diagnóstico.', completed: false, comment: '' }, { id: 804, text: 'Analizar el impacto real del cambio: ¿se logró lo esperado? ¿Qué mejoró? ¿Qué no?', completed: false, comment: '' }, { id: 805, text: 'Obtener feedback constante de los usuarios, incluso después del lanzamiento (buzón digital, encuestas, entrevistas).', completed: false, comment: '' }, { id: 806, text: 'Priorizar ajustes o nuevas funcionalidades con base en datos y necesidades reales.', completed: false, comment: '' }, { id: 807, text: 'Implementar ciclos de mejora continua (Kaizen, PDCA, o iteraciones ágiles).', completed: false, comment: '' }, { id: 808, text: 'Comunicar los resultados y aprendizajes al equipo y stakeholders.', completed: false, comment: '' }, { id: 809, text: 'Planificar nuevas fases de digitalización, si aplica (escalado a más procesos o áreas).', completed: false, comment: '' } ], isOpen: false },
+            { id: 9, icon: '❤️‍🔥', title: '9. Gestión del Cambio Cultural (Transversal)', checkpoints: [ { id: 901, text: 'Comunicar el propósito del proyecto desde el inicio, no solo el “qué” se hace, sino el “por qué”.', completed: false, comment: '' }, { id: 902, text: 'Involucrar a líderes y embajadores del cambio que inspiren y apoyen al resto del equipo.', completed: false, comment: '' }, { id: 903, text: 'Anticipar resistencias emocionales o culturales, y abordarlas con empatía, no con imposición.', completed: false, comment: '' }, { id: 904, text: 'Generar confianza y participación, invitando a los equipos a co-crear soluciones.', completed: false, comment: '' }, { id: 905, text: 'Reforzar continuamente los beneficios del cambio, con ejemplos reales y casos de éxito.', completed: false, comment: '' }, { id: 906, text: 'Celebrar pequeños logros y victorias tempranas, para mantener la motivación.', completed: false, comment: '' }, { id: 907, text: 'Capacitar en habilidades digitales y mindset ágil, no solo en herramientas técnicas.', completed: false, comment: '' }, { id: 908, text: 'Reconocer públicamente a quienes se adaptan rápido, creando una cultura de evolución positiva.', completed: false, comment: '' }, { id: 909, text: 'Construir una narrativa de transformación, donde cada persona se vea como parte fundamental del cambio.', completed: false, comment: '' } ], isOpen: false },
+        ]);
+
+        // --- COMPONENTES ---
+
+        const ProgressBar = ({ progress }) => e('div', { className: 'w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5' }, e('div', { className: 'bg-blue-600 h-1.5 rounded-full', style: { width: `${progress}%` } }));
+
+        const CheckpointItem = ({ checkpoint, onToggle, onUpdateComment }) => {
+            const [isEditing, setIsEditing] = useState(false);
+            const [commentText, setCommentText] = useState(checkpoint.comment || '');
+            const handleSaveComment = () => { onUpdateComment(commentText); setIsEditing(false); };
+            return e('div', { className: 'p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-lg transition-colors duration-200' }, e('div', { className: 'flex items-start' }, e('input', { type: 'checkbox', checked: checkpoint.completed, onChange: onToggle, className: 'h-5 w-5 mt-0.5 text-blue-600 bg-gray-100 border-gray-300 rounded-md focus:ring-blue-500 cursor-pointer' }), e('label', { className: `flex-1 ml-4 text-base font-medium cursor-pointer ${checkpoint.completed ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-800 dark:text-gray-200'}`, onClick: onToggle }, checkpoint.text), e('button', { onClick: () => setIsEditing(!isEditing), className: 'ml-4 p-1 text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors' }, e('svg', { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, e('path', { d: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" })))), !isEditing && checkpoint.comment && e('p', {className: 'mt-2 ml-9 pl-4 text-sm text-gray-600 dark:text-gray-400 border-l-2 border-gray-200 dark:border-gray-700'}, checkpoint.comment), isEditing && e('div', { className: 'mt-3 ml-9' }, e('textarea', { className: 'w-full p-2.5 text-base bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-200 rounded-lg border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500', value: commentText, onChange: (ev) => setCommentText(ev.target.value), placeholder: 'Añadir un comentario...', rows: 3 }), e('button', { onClick: handleSaveComment, className: 'mt-2 px-4 py-1.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors' }, 'Guardar Comentario')));
+        };
+        
+        const Category = ({ category, onToggleCheckpoint, onUpdateComment, onToggleCategory }) => {
+            const progress = useMemo(() => (category.checkpoints.filter(c => c.completed).length / category.checkpoints.length) * 100, [category.checkpoints]);
+            return e('div', { className: 'bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-2xl overflow-hidden mb-5 shadow-sm' }, e('button', { onClick: onToggleCategory, className: 'w-full flex items-center justify-between p-5' }, e('div', { className: 'flex items-center text-left' }, e('span', { className: 'text-2xl mr-4' }, category.icon), e('h3', { className: 'font-semibold text-lg text-gray-900 dark:text-white' }, category.title)), e('div', { className: 'flex items-center' }, e('span', { className: 'text-sm font-semibold text-gray-600 dark:text-gray-300 mr-4' }, `${Math.round(progress)}%`), e('svg', { className: `w-5 h-5 text-gray-500 dark:text-gray-400 transform transition-transform ${category.isOpen ? 'rotate-180' : ''}`, fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' }, e('path', { strokeLinecap: 'round', strokeLinejoin: 'round', strokeWidth: '2.5', d: 'M19 9l-7 7-7-7' })))), category.isOpen && e('div', { className: 'p-2 sm:p-5 border-t border-gray-200 dark:border-gray-700' }, e(ProgressBar, { progress }), e('div', { className: 'mt-4 space-y-2' }, ...category.checkpoints.map(cp => e(CheckpointItem, { key: cp.id, checkpoint: cp, onToggle: () => onToggleCheckpoint(category.id, cp.id), onUpdateComment: (comment) => onUpdateComment(category.id, cp.id, comment) })))));
         };
 
-        const CheckpointItem = ({ checkpoint, onToggle }) => {
-            return e('li', {
-                className: 'flex items-start p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors duration-200 cursor-pointer',
-                onClick: onToggle
-            },
-                e('input', {
-                    type: 'checkbox',
-                    checked: checkpoint.completed,
-                    onChange: onToggle,
-                    className: 'w-5 h-5 mt-0.5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600 cursor-pointer'
-                }),
-                e('label', {
-                    className: `ml-3 text-sm font-medium ${checkpoint.completed ? 'text-gray-500 dark:text-gray-400 line-through' : 'text-gray-900 dark:text-gray-200'} transition-colors duration-200`
-                }, checkpoint.text)
-            );
-        };
-
-        const Category = ({ category, onToggleCheckpoint, onToggleCategory }) => {
-            const progress = useMemo(() => {
-                const completedCount = category.checkpoints.filter(c => c.completed).length;
-                return (completedCount / category.checkpoints.length) * 100;
-            }, [category.checkpoints]);
-
-            const header = e('button', {
-                onClick: onToggleCategory,
-                className: 'w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200'
-            },
-                e('div', { className: 'flex items-center text-left' },
-                    e('span', { className: 'text-xl mr-3' }, category.icon),
-                    e('h3', { className: 'font-semibold text-lg text-gray-900 dark:text-white' }, category.title)
-                ),
-                e('div', { className: 'flex items-center' },
-                    e('span', { className: 'text-sm font-bold text-blue-700 dark:text-blue-400 mr-4' }, `${Math.round(progress)}%`),
-                    e('svg', { className: `w-6 h-6 text-gray-600 dark:text-gray-400 transform transition-transform duration-300 ${category.isOpen ? 'rotate-180' : ''}`, fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24', xmlns: 'http://www.w3.org/2000/svg' },
-                        e('path', { strokeLinecap: 'round', strokeLinejoin: 'round', strokeWidth: '2', d: 'M19 9l-7 7-7-7' })
-                    )
-                )
-            );
-
-            const content = category.isOpen && e('div', { className: 'p-4 bg-white dark:bg-gray-900' },
-                e(ProgressBar, { progress: progress }),
-                e('ul', { className: 'mt-4 space-y-1' },
-                    ...category.checkpoints.map(checkpoint =>
-                        e(CheckpointItem, {
-                            key: checkpoint.id,
-                            checkpoint: checkpoint,
-                            onToggle: () => onToggleCheckpoint(category.id, checkpoint.id)
-                        })
-                    )
-                )
-            );
-
-            return e('div', { className: 'border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden mb-4 shadow-sm' },
-                header,
-                content
-            );
-        };
-
-        function App() {
+        function ProjectManager({ project, onBack, onDataChange }) {
+            const storageKey = `projectData_${project.id}`;
             const [projectData, setProjectData] = useState([]);
             const [isLoading, setIsLoading] = useState(true);
-            const storageKey = 'digitalProjectManagerData';
 
             useEffect(() => {
                 try {
                     const savedData = localStorage.getItem(storageKey);
-                    if (savedData) {
-                        setProjectData(JSON.parse(savedData));
-                    } else {
-                        setProjectData(initialProjectData);
-                    }
-                } catch (error) {
-                    console.error("Error al cargar datos desde localStorage:", error);
-                    setProjectData(initialProjectData);
-                }
+                    setProjectData(savedData ? JSON.parse(savedData) : getInitialProjectData());
+                } catch (error) { setProjectData(getInitialProjectData()); }
                 setIsLoading(false);
-            }, []);
+            }, [project.id]);
 
             useEffect(() => {
                 if (!isLoading) {
-                    try {
-                        localStorage.setItem(storageKey, JSON.stringify(projectData));
-                    } catch (error) {
-                        console.error("Error al guardar datos en localStorage:", error);
-                    }
+                    localStorage.setItem(storageKey, JSON.stringify(projectData));
+                    onDataChange();
                 }
             }, [projectData, isLoading]);
-
-            const handleToggleCheckpoint = useCallback((categoryId, checkpointId) => {
-                setProjectData(currentData =>
-                    currentData.map(category =>
-                        category.id === categoryId ? { ...category, checkpoints: category.checkpoints.map(checkpoint =>
-                            checkpoint.id === checkpointId ? { ...checkpoint, completed: !checkpoint.completed } : checkpoint)
-                        } : category
-                    )
-                );
-            }, []);
-
-            const handleToggleCategory = useCallback(categoryId => {
-                setProjectData(currentData =>
-                    currentData.map(category =>
-                        category.id === categoryId ? { ...category, isOpen: !category.isOpen } : category
-                    )
-                );
-            }, []);
+            
+            const handleToggleCheckpoint = useCallback((catId, cpId) => setProjectData(pd => pd.map(cat => cat.id === catId ? { ...cat, checkpoints: cat.checkpoints.map(cp => cp.id === cpId ? { ...cp, completed: !cp.completed } : cp) } : cat)), []);
+            const handleUpdateComment = useCallback((catId, cpId, comment) => setProjectData(pd => pd.map(cat => cat.id === catId ? { ...cat, checkpoints: cat.checkpoints.map(cp => cp.id === cpId ? { ...cp, comment: comment } : cp) } : cat)), []);
+            const handleToggleCategory = useCallback(catId => setProjectData(pd => pd.map(cat => cat.id === catId ? { ...cat, isOpen: !cat.isOpen } : cat)), []);
 
             const overallProgress = useMemo(() => {
                 if (projectData.length === 0) return 0;
                 const allCheckpoints = projectData.flatMap(c => c.checkpoints);
                 if (allCheckpoints.length === 0) return 0;
-                const completedCount = allCheckpoints.filter(c => c.completed).length;
-                return (completedCount / allCheckpoints.length) * 100;
+                return (allCheckpoints.filter(c => c.completed).length / allCheckpoints.length) * 100;
             }, [projectData]);
 
-            if (isLoading) {
-                return e('div', { className: 'flex items-center justify-center h-screen bg-gray-100 dark:bg-gray-900' },
-                    e('div', { className: 'text-center' },
-                        e('svg', { className: 'mx-auto h-12 w-12 text-blue-500 animate-spin', xmlns: 'http://www.w3.org/2000/svg', fill: 'none', viewBox: '0 0 24 24' },
-                            e('circle', { className: 'opacity-25', cx: '12', cy: '12', r: '10', stroke: 'currentColor', strokeWidth: '4' }),
-                            e('path', { className: 'opacity-75', fill: 'currentColor', d: 'M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z' })
-                        ),
-                        e('p', { className: 'mt-4 text-lg font-semibold text-gray-700 dark:text-gray-300' }, 'Cargando proyecto...')
-                    )
-                );
+            const handleGeneratePDF = () => {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                doc.setFontSize(22);
+                doc.setFont(undefined, 'bold');
+                doc.text(`Reporte de Proyecto: ${project.name}`, 14, 22);
+                doc.setFont(undefined, 'normal');
+                doc.setFontSize(11);
+                doc.setTextColor(100);
+                doc.text(`Cliente: ${project.client}`, 14, 32);
+                doc.text(`Responsable: ${project.responsable}`, 14, 39);
+                doc.text(`Desarrollador: ${project.developer}`, 14, 46);
+                doc.text(`Fecha Compromiso: ${new Date(project.commitmentDate).toLocaleDateString()}`, 14, 53);
+                doc.text(`Progreso General: ${Math.round(overallProgress)}%`, 14, 60);
+                const tableColumn = ["Categoría", "Tarea", "Estado", "Comentario"];
+                const tableRows = [];
+                projectData.forEach(category => {
+                    category.checkpoints.forEach(checkpoint => {
+                        const ticketData = [ category.title, checkpoint.text, checkpoint.completed ? "Completado" : "Pendiente", checkpoint.comment || "" ];
+                        tableRows.push(ticketData);
+                    });
+                });
+                doc.autoTable({ head: [tableColumn], body: tableRows, startY: 70, headStyles: { fillColor: [37, 99, 235] }, alternateRowStyles: { fillColor: [243, 244, 246] } });
+                doc.save(`${project.name}_reporte.pdf`);
+            };
+            
+            const handleExportCSV = () => {
+                let csvContent = "data:text/csv;charset=utf-8,";
+                csvContent += "Categoría,Tarea,Estado,Comentario\r\n";
+                projectData.forEach(category => {
+                    category.checkpoints.forEach(checkpoint => {
+                        const row = [ `"${category.title.replace(/"/g, '""')}"`, `"${checkpoint.text.replace(/"/g, '""')}"`, checkpoint.completed ? "Completado" : "Pendiente", `"${(checkpoint.comment || "").replace(/"/g, '""')}"` ].join(",");
+                        csvContent += row + "\r\n";
+                    });
+                });
+                const encodedUri = encodeURI(csvContent);
+                const link = document.createElement("a");
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", `${project.name}_reporte.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            };
+
+            if (isLoading) return e('div', {className: 'flex justify-center items-center h-screen'}, e('p', { className: 'text-lg' }, 'Cargando proyecto...'));
+
+            return e('div', { className: 'max-w-7xl mx-auto p-4 sm:p-6 md:p-8' }, e('button', { onClick: onBack, className: 'mb-8 text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-2' }, e('svg', { xmlns: "http://www.w3.org/2000/svg", width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "3", strokeLinecap: "round", strokeLinejoin: "round"}, e('path', { d: "M15 18l-6-6 6-6" })), 'Volver a Proyectos'), e('header', { className: 'mb-10 p-8 bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-3xl shadow-lg' }, e('div', { className: 'flex flex-wrap justify-between items-start gap-6' }, e('div', null, e('h1', { className: 'text-4xl font-bold text-gray-900 dark:text-white' }, project.name), e('p', { className: 'text-lg text-gray-500 dark:text-gray-400 mt-1' }, `Cliente: ${project.client}`), e('div', { className: 'mt-2 text-sm text-gray-500 dark:text-gray-400 space-y-1' }, e('p', null, `Responsable: ${project.responsable}`), e('p', null, `Desarrollador: ${project.developer}`))), e('div', {className: 'flex flex-col sm:flex-row gap-3 flex-shrink-0'}, e('button', { onClick: handleGeneratePDF, className: 'px-5 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 text-sm font-semibold rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors' }, 'Generar PDF'), e('button', { onClick: handleExportCSV, className: 'px-5 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors' }, 'Exportar a Excel'))), e('div', { className: 'flex items-center mt-6' }, e('span', { className: 'text-lg font-bold text-gray-800 dark:text-gray-200 mr-4' }, `${Math.round(overallProgress)}%`), e(ProgressBar, { progress: overallProgress }))), e('main', {className: 'space-y-5'}, ...projectData.map(cat => e(Category, { key: cat.id, category: cat, onToggleCheckpoint: handleToggleCheckpoint, onUpdateComment: handleUpdateComment, onToggleCategory: () => handleToggleCategory(cat.id) }))));
+        }
+
+        const ProjectCard = ({ project, onSelect, onDelete }) => {
+            const [progress, setProgress] = useState(0);
+            const calculateProgress = useCallback(() => {
+                try {
+                    const savedData = localStorage.getItem(`projectData_${project.id}`);
+                    if (!savedData) { setProgress(0); return; }
+                    const projectData = JSON.parse(savedData);
+                    const allCheckpoints = projectData.flatMap(c => c.checkpoints);
+                    if (allCheckpoints.length === 0) { setProgress(0); return; }
+                    const completedCount = allCheckpoints.filter(c => c.completed).length;
+                    setProgress((completedCount / allCheckpoints.length) * 100);
+                } catch (error) { setProgress(0); }
+            }, [project.id]);
+
+            useEffect(() => {
+                calculateProgress();
+                const handleStorageChange = () => calculateProgress();
+                window.addEventListener(`storageChange_${project.id}`, handleStorageChange);
+                return () => window.removeEventListener(`storageChange_${project.id}`, handleStorageChange);
+            }, [calculateProgress, project.id]);
+            
+            const getRemainingDays = () => {
+                if (!project.commitmentDate) return null;
+                const dueDate = new Date(project.commitmentDate);
+                const today = new Date();
+                today.setHours(0, 0, 0, 0); 
+                const userTimezoneOffset = dueDate.getTimezoneOffset() * 60000;
+                const adjustedDueDate = new Date(dueDate.getTime() + userTimezoneOffset);
+                const diffTime = adjustedDueDate.getTime() - today.getTime();
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                if (diffDays < 0) return e('span', {className: 'text-sm font-semibold text-red-500'}, 'Vencido');
+                if (diffDays === 0) return e('span', {className: 'text-sm font-semibold text-amber-500'}, 'Vence hoy');
+                return e('span', {className: 'text-sm text-gray-500 dark:text-gray-400'}, `Vence en ${diffDays} día(s)`);
             }
 
-            return e('div', { className: 'bg-gray-100 dark:bg-black min-h-screen font-sans' },
-                e('div', { className: 'container mx-auto p-4 sm:p-6 md:p-8' },
-                    e('header', { className: 'mb-8 p-6 bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700' },
-                        e('h1', { className: 'text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-2' }, 'Gestor de Proyectos Digitales'),
-                        e('p', { className: 'text-md text-gray-600 dark:text-gray-400 mb-4' }, 'Sigue el avance de tu proyecto de digitalización paso a paso.'),
-                        e('div', { className: 'flex items-center' },
-                            e('span', { className: 'text-lg font-bold text-blue-700 dark:text-blue-400 mr-3' }, `${Math.round(overallProgress)}%`),
-                            e(ProgressBar, { progress: overallProgress })
-                        )
+            return e('div', { className: 'project-card relative bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 p-6 rounded-2xl shadow-md cursor-pointer transition-all duration-300 flex flex-col', onClick: () => onSelect(project) }, e('h3', { className: 'text-xl font-bold text-gray-900 dark:text-white' }, project.name), e('p', { className: 'text-gray-500 dark:text-gray-400 mb-4 flex-grow' }, project.client), e('div', {className: 'mt-auto'}, e(ProgressBar, { progress: progress }), e('div', { className: 'flex justify-between items-center mt-2' }, e('span', { className: 'text-sm font-medium text-gray-600 dark:text-gray-300' }, `${Math.round(progress)}%`), getRemainingDays())), e('button', { onClick: (ev) => { ev.stopPropagation(); onDelete(project.id); }, className: 'absolute top-4 right-4 text-gray-400 hover:text-red-500 dark:hover:text-red-400 p-1 rounded-full transition-colors' }, e('svg', { xmlns:"http://www.w3.org/2000/svg", width:"18", height:"18", viewBox:"0 0 24 24", fill:"none", stroke:"currentColor", strokeWidth:"2", strokeLinecap:"round", strokeLinejoin:"round"}, e("polyline",{points:"3 6 5 6 21 6"}),e("path",{d:"M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"}))));
+        }
+
+        const NewProjectModal = ({ isOpen, onClose, onAddProject }) => {
+            const [projectName, setProjectName] = useState('');
+            const [clientName, setClientName] = useState('');
+            const [responsableName, setResponsableName] = useState('');
+            const [developerName, setDeveloperName] = useState('');
+            const [commitmentDate, setCommitmentDate] = useState('');
+
+            const handleAdd = () => {
+                if (!projectName.trim() || !clientName.trim() || !responsableName.trim() || !developerName.trim() || !commitmentDate) {
+                    alert('Por favor, completa todos los campos para crear el proyecto.');
+                    return;
+                }
+                onAddProject(projectName, clientName, responsableName, developerName, commitmentDate);
+                setProjectName(''); setClientName(''); setResponsableName(''); setDeveloperName(''); setCommitmentDate('');
+                onClose();
+            };
+            
+            if (!isOpen) return null;
+            
+            const formInputClass = 'w-full p-3 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-200 rounded-xl border-2 border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent';
+            
+            return e('div', { className: 'modal-backdrop fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4 z-50', onClick: onClose},
+                e('div', { className: 'modal-content bg-white dark:bg-gray-800/80 backdrop-blur-xl border border-gray-200 dark:border-gray-700 w-full max-w-2xl p-8 rounded-3xl shadow-2xl relative', onClick: e => e.stopPropagation()},
+                    e('h2', { className: 'text-3xl font-bold mb-6 text-gray-900 dark:text-white' }, 'Crear Nuevo Proyecto'),
+                    e('div', { className: 'space-y-5' },
+                        e('input', { type: 'text', placeholder: 'Nombre del Proyecto', value: projectName, onChange: ev => setProjectName(ev.target.value), className: formInputClass }),
+                        e('input', { type: 'text', placeholder: 'Nombre del Cliente', value: clientName, onChange: ev => setClientName(ev.target.value), className: formInputClass }),
+                        e('input', { type: 'text', placeholder: 'Nombre del Responsable', value: responsableName, onChange: ev => setResponsableName(ev.target.value), className: formInputClass }),
+                        e('input', { type: 'text', placeholder: 'Nombre del Desarrollador', value: developerName, onChange: ev => setDeveloperName(ev.target.value), className: formInputClass }),
+                        e('div', null, e('label', { htmlFor: 'commitmentDateModal', className: 'block text-sm font-medium text-gray-500 dark:text-gray-400 mb-2' }, 'Fecha de Compromiso'), e('input', { id: 'commitmentDateModal', type: 'date', value: commitmentDate, onChange: ev => setCommitmentDate(ev.target.value), className: formInputClass })),
+                        e('button', { onClick: handleAdd, className: 'w-full bg-blue-600 text-white font-bold py-3.5 px-4 rounded-xl hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500' }, 'Crear Proyecto')
                     ),
-                    e('main', null,
-                        ...projectData.map(category =>
-                            e(Category, {
-                                key: category.id,
-                                category: category,
-                                onToggleCheckpoint: handleToggleCheckpoint,
-                                onToggleCategory: () => handleToggleCategory(category.id)
-                            })
-                        )
-                    ),
-                    e('footer', { className: 'text-center mt-8' },
-                        e('p', { className: 'text-xs text-gray-500 dark:text-gray-400' }, 'Los datos se guardan localmente en tu navegador.')
-                    )
+                    e('button', { onClick: onClose, className: 'absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200' }, e('svg', {className: 'w-6 h-6', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24'}, e('path', { strokeLinecap: 'round', strokeLinejoin: 'round', strokeWidth: '2', d: 'M6 18L18 6M6 6l12 12'})))
                 )
+            );
+        }
+
+        function ProjectList({ projects, onAddProject, onDeleteProject, onSelectProject }) {
+            const [isModalOpen, setIsModalOpen] = useState(false);
+
+            return e('div', { className: 'max-w-7xl mx-auto p-4 sm:p-6 md:p-8' },
+                e(NewProjectModal, { isOpen: isModalOpen, onClose: () => setIsModalOpen(false), onAddProject: onAddProject }),
+                e('header', { className: 'my-10 text-center' },
+                    e('h1', { className: 'text-5xl font-extrabold text-gray-900 dark:text-white' }, 'Digital Project Management Tool'),
+                    e('p', { className: 'text-lg text-gray-500 dark:text-gray-400 mt-2' }, 'by Seven Reasons'),
+                    e('div', { className: 'mt-6 max-w-4xl mx-auto p-4 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 text-sm rounded-2xl' }, e('strong', {className: 'font-semibold text-gray-800 dark:text-white'}, 'Nota Importante: '), 'Esta herramienta guarda toda la información localmente en tu navegador. Si borras el historial o las cookies, los datos se pueden perder. Es una herramienta de apoyo; por favor, toma tus precauciones y realiza respaldos periódicos usando los botones de exportación.')
+                ),
+                e('main', {className: 'mb-10'},
+                    e('div', { className: 'flex justify-between items-center mb-8'},
+                        e('h2', { className: 'text-3xl font-bold text-gray-900 dark:text-white' }, 'Mis Proyectos'),
+                        e('button', { onClick: () => setIsModalOpen(true), className: 'px-5 py-2.5 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors flex items-center gap-2'}, e('svg', {xmlns: "http://www.w3.org/2000/svg", width:"16", height:"16", viewBox:"0 0 24 24", fill:"none", stroke:"currentColor", strokeWidth:"3", strokeLinecap:"round", strokeLinejoin:"round"}, e('line', {x1:"12", y1:"5", x2:"12", y2:"19"}), e('line', {x1:"5", y1:"12", x2:"19", y2:"12"})), 'Nuevo Proyecto')
+                    ),
+                    projects.length === 0 ? e('div', { className: 'text-center text-gray-500 dark:text-gray-400 py-20 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-2xl'}, e('p', {className: 'text-lg'}, 'Aún no tienes proyectos.'), e('p', {className: 'mt-2'}, '¡Crea uno para empezar!')) : e('div', { className: 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8' }, ...projects.map(p => e(ProjectCard, { key: p.id, project: p, onSelect: onSelectProject, onDelete: onDeleteProject })))
+                )
+            );
+        }
+        
+        function App() {
+            const [activeProject, setActiveProject] = useState(null);
+            const [projects, setProjects] = useState([]);
+            const storageKey = 'projectManager_listOfProjects_v2';
+
+            useEffect(() => {
+                try {
+                    const savedProjects = localStorage.getItem(storageKey);
+                    if (savedProjects) setProjects(JSON.parse(savedProjects));
+                } catch (error) { console.error("Error al cargar proyectos:", error); }
+            }, []);
+
+            useEffect(() => { localStorage.setItem(storageKey, JSON.stringify(projects)); }, [projects]);
+
+            const handleAddProject = (name, client, responsable, developer, commitmentDate) => {
+                const newProject = { id: crypto.randomUUID(), name, client, responsable, developer, commitmentDate, creationDate: new Date().toISOString() };
+                setProjects(prev => [...prev, newProject]);
+            };
+            
+            const handleDeleteProject = (id) => {
+                if (confirm('¿Estás seguro de que quieres eliminar este proyecto y todos sus datos? Esta acción es irreversible.')) {
+                    setProjects(prev => prev.filter(p => p.id !== id));
+                    localStorage.removeItem(`projectData_${id}`);
+                }
+            };
+
+            const handleProjectDataChange = (projectId) => {
+                window.dispatchEvent(new Event(`storageChange_${projectId}`));
+            };
+            
+            return e('div', null, activeProject
+                    ? e(ProjectManager, { project: activeProject, onBack: () => setActiveProject(null), onDataChange: () => handleProjectDataChange(activeProject.id) })
+                    : e(ProjectList, { projects: projects, onAddProject: handleAddProject, onDeleteProject: handleDeleteProject, onSelectProject: setActiveProject })
             );
         }
 
