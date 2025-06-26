@@ -1,327 +1,363 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestor de Proyectos Digitales</title>
+    <!-- Incluir Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Incluir React y Babel para transpilar JSX en el navegador -->
+    <script src="https://unpkg.com/react@17/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        /* Estilos adicionales si fueran necesarios */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Configuración para el modo oscuro de Tailwind */
+        .dark .bg-black {
+             background-color: #121212; /* Un negro menos intenso para el fondo */
+        }
+    </style>
+     <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body class="bg-gray-100 dark:bg-black">
 
-// --- DATOS INICIALES DEL PROYECTO ---
-// Estos son los datos base para un nuevo proyecto si no hay nada guardado.
-const initialProjectData = [
-    {
-        id: 1,
-        icon: '🔍',
-        title: '1. Diagnóstico y Evaluación Inicial',
-        checkpoints: [
-            { id: 101, text: 'Identificar procesos clave que pueden digitalizarse (tareas repetitivas, manuales o críticas).', completed: false },
-            { id: 102, text: 'Mapear los flujos actuales ("As-Is") para entender cómo se ejecutan hoy las tareas.', completed: false },
-            { id: 103, text: 'Evaluar el nivel de madurez digital de la organización o del equipo involucrado.', completed: false },
-            { id: 104, text: 'Involucrar a los actores clave de cada área (operativos, líderes y stakeholders).', completed: false },
-            { id: 105, text: 'Detectar fricciones, errores o cuellos de botella en los procesos actuales.', completed: false },
-            { id: 106, text: 'Analizar tecnologías existentes y entender sus limitaciones o integraciones actuales.', completed: false },
-            { id: 107, text: 'Recolectar datos y evidencias reales (tiempos, costos, errores, volumen de trabajo).', completed: false },
-            { id: 108, text: 'Establecer una línea base desde donde se medirá la mejora (benchmark interno).', completed: false },
-        ],
-    },
-    {
-        id: 2,
-        icon: '🎯',
-        title: '2. Definición de Objetivos y Alcance',
-        checkpoints: [
-            { id: 201, text: 'Establecer objetivos SMART (Específicos, Medibles, Alcanzables, Relevantes y con Tiempo definido).', completed: false },
-            { id: 202, text: 'Definir el alcance del proyecto, es decir, qué procesos o áreas se incluirán y cuáles no.', completed: false },
-            { id: 203, text: 'Alinear los objetivos con la estrategia del negocio (eficiencia, crecimiento, experiencia del cliente, etc.).', completed: false },
-            { id: 204, text: 'Identificar restricciones (presupuesto, tiempo, recursos humanos, tecnología disponible).', completed: false },
-            { id: 205, text: 'Asignar responsables claros para cada fase o entregable del proyecto.', completed: false },
-            { id: 206, text: 'Establecer entregables concretos para cada etapa del proyecto.', completed: false },
-            { id: 207, text: 'Priorizar procesos según impacto y viabilidad, utilizando por ejemplo la matriz Esfuerzo-Impacto.', completed: false },
-            { id: 208, text: 'Establecer criterios de éxito: ¿Cómo sabremos que el proyecto fue exitoso?', completed: false },
-        ],
-    },
-    {
-        id: 3,
-        icon: '⚙️',
-        title: '3. Selección de Herramientas y Tecnologías',
-        checkpoints: [
-            { id: 301, text: 'Investigar opciones tecnológicas disponibles (software, plataformas, APIs, apps low-code/no-code, etc.).', completed: false },
-            { id: 302, text: 'Evaluar cada herramienta según criterios clave: Costo total, Facilidad de uso, Compatibilidad, Seguridad.', completed: false },
-            { id: 303, text: 'Probar herramientas en entornos demo o versiones gratuitas antes de comprometer inversión.', completed: false },
-            { id: 304, text: 'Consultar con el equipo técnico o proveedor de TI sobre implicaciones e infraestructura necesaria.', completed: false },
-            { id: 305, text: 'Seleccionar herramientas que escalen con el proyecto, es decir, que puedan crecer conforme crece el uso.', completed: false },
-            { id: 306, text: 'Considerar soluciones que empoderen al usuario final (no depender siempre del área de sistemas).', completed: false },
-            { id: 307, text: 'Verificar si ya hay herramientas internas subutilizadas que puedan adaptarse al proyecto.', completed: false },
-            { id: 308, text: 'Documentar las razones de elección para justificar la decisión frente a stakeholders.', completed: false },
-        ],
-    },
-    {
-        id: 4,
-        icon: '🧩',
-        title: '4. Diseño del Proceso Digital (To-Be)',
-        checkpoints: [
-            { id: 401, text: 'Modelar el flujo futuro del proceso (To-Be) usando diagramas de flujo, BPMN o herramientas visuales.', completed: false },
-            { id: 402, text: 'Simplificar y optimizar el proceso antes de digitalizarlo, eliminando pasos innecesarios.', completed: false },
-            { id: 403, text: 'Definir claramente las tareas automatizadas vs. las tareas humanas.', completed: false },
-            { id: 404, text: 'Establecer roles y responsables dentro del nuevo flujo digital.', completed: false },
-            { id: 405, text: 'Diseñar formularios, interfaces o entradas de datos necesarias para operar el proceso.', completed: false },
-            { id: 406, text: 'Incluir reglas de negocio clave (validaciones, condiciones, cálculos, aprobaciones, etc.).', completed: false },
-            { id: 407, text: 'Planear alertas, notificaciones o reportes automáticos que acompañen el proceso.', completed: false },
-            { id: 408, text: 'Asegurar trazabilidad: que todo paso deje evidencia digital o log (para auditoría y mejora continua).', completed: false },
-            { id: 409, text: 'Anticipar excepciones y errores comunes y cómo deben manejarse digitalmente.', completed: false },
-        ],
-    },
-    {
-        id: 5,
-        icon: '🔧',
-        title: '5. Desarrollo y Configuración',
-        checkpoints: [
-            { id: 501, text: 'Configurar o desarrollar la solución digital según el diseño del proceso To-Be.', completed: false },
-            { id: 502, text: 'Construir formularios, automatizaciones, interfaces y dashboards dentro de la herramienta elegida.', completed: false },
-            { id: 503, text: 'Integrar bases de datos o fuentes de información externas, si el proceso lo requiere.', completed: false },
-            { id: 504, text: 'Conectar con otros sistemas o herramientas existentes (ej. CRM, ERP, correo, SharePoint, etc.).', completed: false },
-            { id: 505, text: 'Aplicar buenas prácticas de desarrollo: modularidad, limpieza visual, nombres coherentes, reutilización.', completed: false },
-            { id: 506, text: 'Configurar reglas de seguridad y permisos de usuario, para definir quién puede ver, editar o aprobar.', completed: false },
-            { id: 507, text: 'Crear respaldos periódicos y sistemas de recuperación ante fallos.', completed: false },
-            { id: 508, text: 'Probar cada componente del sistema de forma individual antes de realizar pruebas completas.', completed: false },
-            { id: 509, text: 'Documentar todo el desarrollo (estructura, lógica, accesos y decisiones tomadas).', completed: false },
-        ],
-    },
-    {
-        id: 6,
-        icon: '🧪',
-        title: '6. Prueba Piloto',
-        checkpoints: [
-            { id: 601, text: 'Seleccionar un grupo reducido de usuarios reales para hacer la prueba (usuarios clave o representantes del flujo).', completed: false },
-            { id: 602, text: 'Ejecutar el proceso digital en un entorno controlado, simulando escenarios reales.', completed: false },
-            { id: 603, text: 'Medir desempeño del sistema: tiempos de respuesta, exactitud, errores, fricciones.', completed: false },
-            { id: 604, text: 'Observar la experiencia del usuario final: ¿Entiende? ¿Comete errores? ¿Se siente cómodo?', completed: false },
-            { id: 605, text: 'Recolectar feedback estructurado (entrevistas, encuestas o sesiones grabadas).', completed: false },
-            { id: 606, text: 'Registrar errores o bugs, tanto técnicos como funcionales.', completed: false },
-            { id: 607, text: 'Documentar hallazgos y oportunidades de mejora antes del despliegue general.', completed: false },
-            { id: 608, text: 'Ajustar el sistema según los resultados: mejorar formularios, automatizaciones, nomenclaturas o flujos.', completed: false },
-            { id: 609, text: 'Validar cumplimiento de los criterios de éxito definidos en las etapas previas.', completed: false },
-        ],
-    },
-    {
-        id: 7,
-        icon: '🚀',
-        title: '7. Implementación General',
-        checkpoints: [
-            { id: 701, text: 'Lanzar oficialmente el proceso digitalizado en todo el equipo o área definida.', completed: false },
-            { id: 702, text: 'Capacitar a todos los usuarios finales, con enfoque práctico y adaptado a su nivel.', completed: false },
-            { id: 703, text: 'Entregar materiales de apoyo: manuales, tutoriales, videos cortos, preguntas frecuentes.', completed: false },
-            { id: 704, text: 'Establecer canales de soporte técnico y funcional, para resolver dudas o incidencias rápidamente.', completed: false },
-            { id: 705, text: 'Designar responsables de seguimiento durante los primeros días o semanas del uso real.', completed: false },
-            { id: 706, text: 'Monitorear el uso del sistema en tiempo real, para detectar caídas o errores tempranos.', completed: false },
-            { id: 707, text: 'Aplicar ajustes rápidos (hotfixes) si surgen bloqueos críticos en la operación.', completed: false },
-            { id: 708, text: 'Acompañar emocionalmente el cambio: resolver temores, dudas o resistencias con empatía.', completed: false },
-            { id: 709, text: 'Comunicar logros y beneficios iniciales, reforzando el valor del cambio para todos los involucrados.', completed: false },
-        ],
-    },
-    {
-        id: 8,
-        icon: '📊',
-        title: '8. Medición y Mejora Continua',
-        checkpoints: [
-            { id: 801, text: 'Definir indicadores clave (KPIs) que midan el éxito del proceso digital (ej. tiempo de ejecución, tasa de error, satisfacción del usuario, ahorro en costos).', completed: false },
-            { id: 802, text: 'Recolectar datos en tiempo real sobre el uso y desempeño del sistema.', completed: false },
-            { id: 803, text: 'Comparar resultados con la línea base establecida en la etapa de diagnóstico.', completed: false },
-            { id: 804, text: 'Analizar el impacto real del cambio: ¿se logró lo esperado? ¿Qué mejoró? ¿Qué no?', completed: false },
-            { id: 805, text: 'Obtener feedback constante de los usuarios, incluso después del lanzamiento (buzón digital, encuestas, entrevistas).', completed: false },
-            { id: 806, text: 'Priorizar ajustes o nuevas funcionalidades con base en datos y necesidades reales.', completed: false },
-            { id: 807, text: 'Implementar ciclos de mejora continua (Kaizen, PDCA, o iteraciones ágiles).', completed: false },
-            { id: 808, text: 'Comunicar los resultados y aprendizajes al equipo y stakeholders.', completed: false },
-            { id: 809, text: 'Planificar nuevas fases de digitalización, si aplica (escalado a más procesos o áreas).', completed: false },
-        ],
-    },
-    {
-        id: 9,
-        icon: '❤️‍🔥',
-        title: '9. Gestión del Cambio Cultural (Transversal)',
-        checkpoints: [
-            { id: 901, text: 'Comunicar el propósito del proyecto desde el inicio, no solo el “qué” se hace, sino el “por qué”.', completed: false },
-            { id: 902, text: 'Involucrar a líderes y embajadores del cambio que inspiren y apoyen al resto del equipo.', completed: false },
-            { id: 903, text: 'Anticipar resistencias emocionales o culturales, y abordarlas con empatía, no con imposición.', completed: false },
-            { id: 904, text: 'Generar confianza y participación, invitando a los equipos a co-crear soluciones.', completed: false },
-            { id: 905, text: 'Reforzar continuamente los beneficios del cambio, con ejemplos reales y casos de éxito.', completed: false },
-            { id: 906, text: 'Celebrar pequeños logros y victorias tempranas, para mantener la motivación.', completed: false },
-            { id: 907, text: 'Capacitar en habilidades digitales y mindset ágil, no solo en herramientas técnicas.', completed: false },
-            { id: 908, text: 'Reconocer públicamente a quienes se adaptan rápido, creando una cultura de evolución positiva.', completed: false },
-            { id: 909, text: 'Construir una narrativa de transformación, donde cada persona se vea como parte fundamental del cambio.', completed: false },
-        ],
-    }
-].map(category => ({ ...category, isOpen: category.id === 1 })); // Inicia con la primera categoría abierta
+    <div id="root"></div>
 
-// --- COMPONENTES ---
+    <script type="text/babel">
+        const { useState, useEffect, useCallback, useMemo } = React;
 
-const ProgressBar = ({ progress }) => (
-    <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
-        <div
-            className="bg-blue-600 h-2.5 rounded-full transition-all duration-500 ease-out"
-            style={{ width: `${progress}%` }}
-        ></div>
-    </div>
-);
+        // --- DATOS INICIALES DEL PROYECTO ---
+        // Estos son los datos base para un nuevo proyecto si no hay nada guardado.
+        const initialProjectData = [
+            {
+                id: 1,
+                icon: '🔍',
+                title: '1. Diagnóstico y Evaluación Inicial',
+                checkpoints: [
+                    { id: 101, text: 'Identificar procesos clave que pueden digitalizarse (tareas repetitivas, manuales o críticas).', completed: false },
+                    { id: 102, text: 'Mapear los flujos actuales ("As-Is") para entender cómo se ejecutan hoy las tareas.', completed: false },
+                    { id: 103, text: 'Evaluar el nivel de madurez digital de la organización o del equipo involucrado.', completed: false },
+                    { id: 104, text: 'Involucrar a los actores clave de cada área (operativos, líderes y stakeholders).', completed: false },
+                    { id: 105, text: 'Detectar fricciones, errores o cuellos de botella en los procesos actuales.', completed: false },
+                    { id: 106, text: 'Analizar tecnologías existentes y entender sus limitaciones o integraciones actuales.', completed: false },
+                    { id: 107, text: 'Recolectar datos y evidencias reales (tiempos, costos, errores, volumen de trabajo).', completed: false },
+                    { id: 108, text: 'Establecer una línea base desde donde se medirá la mejora (benchmark interno).', completed: false },
+                ],
+            },
+            {
+                id: 2,
+                icon: '🎯',
+                title: '2. Definición de Objetivos y Alcance',
+                checkpoints: [
+                    { id: 201, text: 'Establecer objetivos SMART (Específicos, Medibles, Alcanzables, Relevantes y con Tiempo definido).', completed: false },
+                    { id: 202, text: 'Definir el alcance del proyecto, es decir, qué procesos o áreas se incluirán y cuáles no.', completed: false },
+                    { id: 203, text: 'Alinear los objetivos con la estrategia del negocio (eficiencia, crecimiento, experiencia del cliente, etc.).', completed: false },
+                    { id: 204, text: 'Identificar restricciones (presupuesto, tiempo, recursos humanos, tecnología disponible).', completed: false },
+                    { id: 205, text: 'Asignar responsables claros para cada fase o entregable del proyecto.', completed: false },
+                    { id: 206, text: 'Establecer entregables concretos para cada etapa del proyecto.', completed: false },
+                    { id: 207, text: 'Priorizar procesos según impacto y viabilidad, utilizando por ejemplo la matriz Esfuerzo-Impacto.', completed: false },
+                    { id: 208, text: 'Establecer criterios de éxito: ¿Cómo sabremos que el proyecto fue exitoso?', completed: false },
+                ],
+            },
+            {
+                id: 3,
+                icon: '⚙️',
+                title: '3. Selección de Herramientas y Tecnologías',
+                checkpoints: [
+                    { id: 301, text: 'Investigar opciones tecnológicas disponibles (software, plataformas, APIs, apps low-code/no-code, etc.).', completed: false },
+                    { id: 302, text: 'Evaluar cada herramienta según criterios clave: Costo total, Facilidad de uso, Compatibilidad, Seguridad.', completed: false },
+                    { id: 303, text: 'Probar herramientas en entornos demo o versiones gratuitas antes de comprometer inversión.', completed: false },
+                    { id: 304, text: 'Consultar con el equipo técnico o proveedor de TI sobre implicaciones e infraestructura necesaria.', completed: false },
+                    { id: 305, text: 'Seleccionar herramientas que escalen con el proyecto, es decir, que puedan crecer conforme crece el uso.', completed: false },
+                    { id: 306, text: 'Considerar soluciones que empoderen al usuario final (no depender siempre del área de sistemas).', completed: false },
+                    { id: 307, text: 'Verificar si ya hay herramientas internas subutilizadas que puedan adaptarse al proyecto.', completed: false },
+                    { id: 308, text: 'Documentar las razones de elección para justificar la decisión frente a stakeholders.', completed: false },
+                ],
+            },
+            {
+                id: 4,
+                icon: '🧩',
+                title: '4. Diseño del Proceso Digital (To-Be)',
+                checkpoints: [
+                    { id: 401, text: 'Modelar el flujo futuro del proceso (To-Be) usando diagramas de flujo, BPMN o herramientas visuales.', completed: false },
+                    { id: 402, text: 'Simplificar y optimizar el proceso antes de digitalizarlo, eliminando pasos innecesarios.', completed: false },
+                    { id: 403, text: 'Definir claramente las tareas automatizadas vs. las tareas humanas.', completed: false },
+                    { id: 404, text: 'Establecer roles y responsables dentro del nuevo flujo digital.', completed: false },
+                    { id: 405, text: 'Diseñar formularios, interfaces o entradas de datos necesarias para operar el proceso.', completed: false },
+                    { id: 406, text: 'Incluir reglas de negocio clave (validaciones, condiciones, cálculos, aprobaciones, etc.).', completed: false },
+                    { id: 407, text: 'Planear alertas, notificaciones o reportes automáticos que acompañen el proceso.', completed: false },
+                    { id: 408, text: 'Asegurar trazabilidad: que todo paso deje evidencia digital o log (para auditoría y mejora continua).', completed: false },
+                    { id: 409, text: 'Anticipar excepciones y errores comunes y cómo deben manejarse digitalmente.', completed: false },
+                ],
+            },
+            {
+                id: 5,
+                icon: '🔧',
+                title: '5. Desarrollo y Configuración',
+                checkpoints: [
+                    { id: 501, text: 'Configurar o desarrollar la solución digital según el diseño del proceso To-Be.', completed: false },
+                    { id: 502, text: 'Construir formularios, automatizaciones, interfaces y dashboards dentro de la herramienta elegida.', completed: false },
+                    { id: 503, text: 'Integrar bases de datos o fuentes de información externas, si el proceso lo requiere.', completed: false },
+                    { id: 504, text: 'Conectar con otros sistemas o herramientas existentes (ej. CRM, ERP, correo, SharePoint, etc.).', completed: false },
+                    { id: 505, text: 'Aplicar buenas prácticas de desarrollo: modularidad, limpieza visual, nombres coherentes, reutilización.', completed: false },
+                    { id: 506, text: 'Configurar reglas de seguridad y permisos de usuario, para definir quién puede ver, editar o aprobar.', completed: false },
+                    { id: 507, text: 'Crear respaldos periódicos y sistemas de recuperación ante fallos.', completed: false },
+                    { id: 508, text: 'Probar cada componente del sistema de forma individual antes de realizar pruebas completas.', completed: false },
+                    { id: 509, text: 'Documentar todo el desarrollo (estructura, lógica, accesos y decisiones tomadas).', completed: false },
+                ],
+            },
+            {
+                id: 6,
+                icon: '🧪',
+                title: '6. Prueba Piloto',
+                checkpoints: [
+                    { id: 601, text: 'Seleccionar un grupo reducido de usuarios reales para hacer la prueba (usuarios clave o representantes del flujo).', completed: false },
+                    { id: 602, text: 'Ejecutar el proceso digital en un entorno controlado, simulando escenarios reales.', completed: false },
+                    { id: 603, text: 'Medir desempeño del sistema: tiempos de respuesta, exactitud, errores, fricciones.', completed: false },
+                    { id: 604, text: 'Observar la experiencia del usuario final: ¿Entiende? ¿Comete errores? ¿Se siente cómodo?', completed: false },
+                    { id: 605, text: 'Recolectar feedback estructurado (entrevistas, encuestas o sesiones grabadas).', completed: false },
+                    { id: 606, text: 'Registrar errores o bugs, tanto técnicos como funcionales.', completed: false },
+                    { id: 607, text: 'Documentar hallazgos y oportunidades de mejora antes del despliegue general.', completed: false },
+                    { id: 608, text: 'Ajustar el sistema según los resultados: mejorar formularios, automatizaciones, nomenclaturas o flujos.', completed: false },
+                    { id: 609, text: 'Validar cumplimiento de los criterios de éxito definidos en las etapas previas.', completed: false },
+                ],
+            },
+            {
+                id: 7,
+                icon: '🚀',
+                title: '7. Implementación General',
+                checkpoints: [
+                    { id: 701, text: 'Lanzar oficialmente el proceso digitalizado en todo el equipo o área definida.', completed: false },
+                    { id: 702, text: 'Capacitar a todos los usuarios finales, con enfoque práctico y adaptado a su nivel.', completed: false },
+                    { id: 703, text: 'Entregar materiales de apoyo: manuales, tutoriales, videos cortos, preguntas frecuentes.', completed: false },
+                    { id: 704, text: 'Establecer canales de soporte técnico y funcional, para resolver dudas o incidencias rápidamente.', completed: false },
+                    { id: 705, text: 'Designar responsables de seguimiento durante los primeros días o semanas del uso real.', completed: false },
+                    { id: 706, text: 'Monitorear el uso del sistema en tiempo real, para detectar caídas o errores tempranos.', completed: false },
+                    { id: 707, text: 'Aplicar ajustes rápidos (hotfixes) si surgen bloqueos críticos en la operación.', completed: false },
+                    { id: 708, text: 'Acompañar emocionalmente el cambio: resolver temores, dudas o resistencias con empatía.', completed: false },
+                    { id: 709, text: 'Comunicar logros y beneficios iniciales, reforzando el valor del cambio para todos los involucrados.', completed: false },
+                ],
+            },
+            {
+                id: 8,
+                icon: '📊',
+                title: '8. Medición y Mejora Continua',
+                checkpoints: [
+                    { id: 801, text: 'Definir indicadores clave (KPIs) que midan el éxito del proceso digital (ej. tiempo de ejecución, tasa de error, satisfacción del usuario, ahorro en costos).', completed: false },
+                    { id: 802, text: 'Recolectar datos en tiempo real sobre el uso y desempeño del sistema.', completed: false },
+                    { id: 803, text: 'Comparar resultados con la línea base establecida en la etapa de diagnóstico.', completed: false },
+                    { id: 804, text: 'Analizar el impacto real del cambio: ¿se logró lo esperado? ¿Qué mejoró? ¿Qué no?', completed: false },
+                    { id: 805, text: 'Obtener feedback constante de los usuarios, incluso después del lanzamiento (buzón digital, encuestas, entrevistas).', completed: false },
+                    { id: 806, text: 'Priorizar ajustes o nuevas funcionalidades con base en datos y necesidades reales.', completed: false },
+                    { id: 807, text: 'Implementar ciclos de mejora continua (Kaizen, PDCA, o iteraciones ágiles).', completed: false },
+                    { id: 808, text: 'Comunicar los resultados y aprendizajes al equipo y stakeholders.', completed: false },
+                    { id: 809, text: 'Planificar nuevas fases de digitalización, si aplica (escalado a más procesos o áreas).', completed: false },
+                ],
+            },
+            {
+                id: 9,
+                icon: '❤️‍🔥',
+                title: '9. Gestión del Cambio Cultural (Transversal)',
+                checkpoints: [
+                    { id: 901, text: 'Comunicar el propósito del proyecto desde el inicio, no solo el “qué” se hace, sino el “por qué”.', completed: false },
+                    { id: 902, text: 'Involucrar a líderes y embajadores del cambio que inspiren y apoyen al resto del equipo.', completed: false },
+                    { id: 903, text: 'Anticipar resistencias emocionales o culturales, y abordarlas con empatía, no con imposición.', completed: false },
+                    { id: 904, text: 'Generar confianza y participación, invitando a los equipos a co-crear soluciones.', completed: false },
+                    { id: 905, text: 'Reforzar continuamente los beneficios del cambio, con ejemplos reales y casos de éxito.', completed: false },
+                    { id: 906, text: 'Celebrar pequeños logros y victorias tempranas, para mantener la motivación.', completed: false },
+                    { id: 907, text: 'Capacitar en habilidades digitales y mindset ágil, no solo en herramientas técnicas.', completed: false },
+                    { id: 908, text: 'Reconocer públicamente a quienes se adaptan rápido, creando una cultura de evolución positiva.', completed: false },
+                    { id: 909, text: 'Construir una narrativa de transformación, donde cada persona se vea como parte fundamental del cambio.', completed: false },
+                ],
+            }
+        ].map(category => ({ ...category, isOpen: category.id === 1 }));
 
-const CheckpointItem = ({ checkpoint, onToggle }) => (
-    <li
-        className="flex items-start p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors duration-200 cursor-pointer"
-        onClick={onToggle}
-    >
-        <input
-            type="checkbox"
-            checked={checkpoint.completed}
-            onChange={onToggle}
-            className="w-5 h-5 mt-0.5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600 cursor-pointer"
-        />
-        <label className={`ml-3 text-sm font-medium ${checkpoint.completed ? 'text-gray-500 dark:text-gray-400 line-through' : 'text-gray-900 dark:text-gray-200'} transition-colors duration-200`}>
-            {checkpoint.text}
-        </label>
-    </li>
-);
+        // --- COMPONENTES ---
 
-const Category = ({ category, onToggleCheckpoint, onToggleCategory }) => {
-    const progress = useMemo(() => {
-        const completedCount = category.checkpoints.filter(c => c.completed).length;
-        return (completedCount / category.checkpoints.length) * 100;
-    }, [category.checkpoints]);
+        const ProgressBar = ({ progress }) => (
+            <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
+                <div
+                    className="bg-blue-600 h-2.5 rounded-full transition-all duration-500 ease-out"
+                    style={{ width: `${progress}%` }}
+                ></div>
+            </div>
+        );
 
-    return (
-        <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden mb-4 shadow-sm">
-            <button
-                onClick={onToggleCategory}
-                className="w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
+        const CheckpointItem = ({ checkpoint, onToggle }) => (
+            <li
+                className="flex items-start p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors duration-200 cursor-pointer"
+                onClick={onToggle}
             >
-                <div className="flex items-center text-left">
-                    <span className="text-xl mr-3">{category.icon}</span>
-                    <h3 className="font-semibold text-lg text-gray-900 dark:text-white">{category.title}</h3>
+                <input
+                    type="checkbox"
+                    checked={checkpoint.completed}
+                    onChange={onToggle}
+                    className="w-5 h-5 mt-0.5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600 cursor-pointer"
+                />
+                <label className={`ml-3 text-sm font-medium ${checkpoint.completed ? 'text-gray-500 dark:text-gray-400 line-through' : 'text-gray-900 dark:text-gray-200'} transition-colors duration-200`}>
+                    {checkpoint.text}
+                </label>
+            </li>
+        );
+
+        const Category = ({ category, onToggleCheckpoint, onToggleCategory }) => {
+            const progress = useMemo(() => {
+                const completedCount = category.checkpoints.filter(c => c.completed).length;
+                return (completedCount / category.checkpoints.length) * 100;
+            }, [category.checkpoints]);
+
+            return (
+                <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden mb-4 shadow-sm">
+                    <button
+                        onClick={onToggleCategory}
+                        className="w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
+                    >
+                        <div className="flex items-center text-left">
+                            <span className="text-xl mr-3">{category.icon}</span>
+                            <h3 className="font-semibold text-lg text-gray-900 dark:text-white">{category.title}</h3>
+                        </div>
+                        <div className="flex items-center">
+                            <span className="text-sm font-bold text-blue-700 dark:text-blue-400 mr-4">{Math.round(progress)}%</span>
+                            <svg className={`w-6 h-6 text-gray-600 dark:text-gray-400 transform transition-transform duration-300 ${category.isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </div>
+                    </button>
+                    {category.isOpen && (
+                        <div className="p-4 bg-white dark:bg-gray-900">
+                            <ProgressBar progress={progress} />
+                            <ul className="mt-4 space-y-1">
+                                {category.checkpoints.map(checkpoint => (
+                                    <CheckpointItem
+                                        key={checkpoint.id}
+                                        checkpoint={checkpoint}
+                                        onToggle={() => onToggleCheckpoint(category.id, checkpoint.id)}
+                                    />
+                                ))}
+                            </ul>
+                        </div>
+                    )}
                 </div>
-                <div className="flex items-center">
-                    <span className="text-sm font-bold text-blue-700 dark:text-blue-400 mr-4">{Math.round(progress)}%</span>
-                    <svg className={`w-6 h-6 text-gray-600 dark:text-gray-400 transform transition-transform duration-300 ${category.isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-                </div>
-            </button>
-            {category.isOpen && (
-                <div className="p-4 bg-white dark:bg-gray-900">
-                    <ProgressBar progress={progress} />
-                    <ul className="mt-4 space-y-1">
-                        {category.checkpoints.map(checkpoint => (
-                            <CheckpointItem
-                                key={checkpoint.id}
-                                checkpoint={checkpoint}
-                                onToggle={() => onToggleCheckpoint(category.id, checkpoint.id)}
-                            />
-                        ))}
-                    </ul>
-                </div>
-            )}
-        </div>
-    );
-};
+            );
+        };
 
-// --- COMPONENTE PRINCIPAL DE LA APLICACIÓN ---
-export default function App() {
-    const [projectData, setProjectData] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const storageKey = 'digitalProjectManagerData';
+        // --- COMPONENTE PRINCIPAL DE LA APLICACIÓN ---
+        function App() {
+            const [projectData, setProjectData] = useState([]);
+            const [isLoading, setIsLoading] = useState(true);
+            const storageKey = 'digitalProjectManagerData';
 
-    // Cargar datos desde localStorage al iniciar la aplicación
-    useEffect(() => {
-        try {
-            const savedData = localStorage.getItem(storageKey);
-            if (savedData) {
-                setProjectData(JSON.parse(savedData));
-            } else {
-                setProjectData(initialProjectData);
-            }
-        } catch (error) {
-            console.error("Error al cargar datos desde localStorage:", error);
-            setProjectData(initialProjectData);
-        }
-        setIsLoading(false);
-    }, []);
-
-    // Guardar datos en localStorage cada vez que projectData cambie
-    useEffect(() => {
-        if (!isLoading) {
-            try {
-                localStorage.setItem(storageKey, JSON.stringify(projectData));
-            } catch (error) {
-                console.error("Error al guardar datos en localStorage:", error);
-            }
-        }
-    }, [projectData, isLoading]);
-
-    const handleToggleCheckpoint = useCallback((categoryId, checkpointId) => {
-        setProjectData(currentData =>
-            currentData.map(category => {
-                if (category.id === categoryId) {
-                    return {
-                        ...category,
-                        checkpoints: category.checkpoints.map(checkpoint =>
-                            checkpoint.id === checkpointId
-                                ? { ...checkpoint, completed: !checkpoint.completed }
-                                : checkpoint
-                        ),
-                    };
+            // Cargar datos desde localStorage al iniciar la aplicación
+            useEffect(() => {
+                try {
+                    const savedData = localStorage.getItem(storageKey);
+                    if (savedData) {
+                        setProjectData(JSON.parse(savedData));
+                    } else {
+                        setProjectData(initialProjectData);
+                    }
+                } catch (error) {
+                    console.error("Error al cargar datos desde localStorage:", error);
+                    setProjectData(initialProjectData);
                 }
-                return category;
-            })
-        );
-    }, []);
+                setIsLoading(false);
+            }, []);
 
-    const handleToggleCategory = useCallback(categoryId => {
-        setProjectData(currentData =>
-            currentData.map(category =>
-                category.id === categoryId ? { ...category, isOpen: !category.isOpen } : category
-            )
-        );
-    }, []);
+            // Guardar datos en localStorage cada vez que projectData cambie
+            useEffect(() => {
+                if (!isLoading) {
+                    try {
+                        localStorage.setItem(storageKey, JSON.stringify(projectData));
+                    } catch (error) {
+                        console.error("Error al guardar datos en localStorage:", error);
+                    }
+                }
+            }, [projectData, isLoading]);
 
-    const overallProgress = useMemo(() => {
-        if (projectData.length === 0) return 0;
-        const allCheckpoints = projectData.flatMap(c => c.checkpoints);
-        if (allCheckpoints.length === 0) return 0;
-        const completedCount = allCheckpoints.filter(c => c.completed).length;
-        return (completedCount / allCheckpoints.length) * 100;
-    }, [projectData]);
+            const handleToggleCheckpoint = useCallback((categoryId, checkpointId) => {
+                setProjectData(currentData =>
+                    currentData.map(category => {
+                        if (category.id === categoryId) {
+                            return {
+                                ...category,
+                                checkpoints: category.checkpoints.map(checkpoint =>
+                                    checkpoint.id === checkpointId
+                                        ? { ...checkpoint, completed: !checkpoint.completed }
+                                        : checkpoint
+                                ),
+                            };
+                        }
+                        return category;
+                    })
+                );
+            }, []);
 
-    if (isLoading) {
-        return (
-            <div className="flex items-center justify-center h-screen bg-gray-100 dark:bg-gray-900">
-                <div className="text-center">
-                    <svg className="mx-auto h-12 w-12 text-blue-500 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <p className="mt-4 text-lg font-semibold text-gray-700 dark:text-gray-300">Cargando proyecto...</p>
-                </div>
-            </div>
-        );
-    }
+            const handleToggleCategory = useCallback(categoryId => {
+                setProjectData(currentData =>
+                    currentData.map(category =>
+                        category.id === categoryId ? { ...category, isOpen: !category.isOpen } : category
+                    )
+                );
+            }, []);
 
-    return (
-        <div className="bg-gray-100 dark:bg-black min-h-screen font-sans">
-            <div className="container mx-auto p-4 sm:p-6 md:p-8">
-                <header className="mb-8 p-6 bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700">
-                    <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-2">Gestor de Proyectos Digitales</h1>
-                    <p className="text-md text-gray-600 dark:text-gray-400 mb-4">Sigue el avance de tu proyecto de digitalización paso a paso.</p>
-                    <div className="flex items-center">
-                        <span className="text-lg font-bold text-blue-700 dark:text-blue-400 mr-3">{Math.round(overallProgress)}%</span>
-                        <ProgressBar progress={overallProgress} />
+            const overallProgress = useMemo(() => {
+                if (projectData.length === 0) return 0;
+                const allCheckpoints = projectData.flatMap(c => c.checkpoints);
+                if (allCheckpoints.length === 0) return 0;
+                const completedCount = allCheckpoints.filter(c => c.completed).length;
+                return (completedCount / allCheckpoints.length) * 100;
+            }, [projectData]);
+
+            if (isLoading) {
+                return (
+                    <div className="flex items-center justify-center h-screen bg-gray-100 dark:bg-gray-900">
+                        <div className="text-center">
+                            <svg className="mx-auto h-12 w-12 text-blue-500 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <p className="mt-4 text-lg font-semibold text-gray-700 dark:text-gray-300">Cargando proyecto...</p>
+                        </div>
                     </div>
-                </header>
+                );
+            }
 
-                <main>
-                    {projectData.map(category => (
-                        <Category
-                            key={category.id}
-                            category={category}
-                            onToggleCheckpoint={handleToggleCheckpoint}
-                            onToggleCategory={() => handleToggleCategory(category.id)}
-                        />
-                    ))}
-                </main>
-                 <footer className="text-center mt-8">
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Los datos se guardan localmente en tu navegador.
-                    </p>
-                 </footer>
-            </div>
-        </div>
-    );
-}
+            return (
+                <div className="bg-gray-100 dark:bg-black min-h-screen font-sans">
+                    <div className="container mx-auto p-4 sm:p-6 md:p-8">
+                        <header className="mb-8 p-6 bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700">
+                            <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-2">Gestor de Proyectos Digitales</h1>
+                            <p className="text-md text-gray-600 dark:text-gray-400 mb-4">Sigue el avance de tu proyecto de digitalización paso a paso.</p>
+                            <div className="flex items-center">
+                                <span className="text-lg font-bold text-blue-700 dark:text-blue-400 mr-3">{Math.round(overallProgress)}%</span>
+                                <ProgressBar progress={overallProgress} />
+                            </div>
+                        </header>
+
+                        <main>
+                            {projectData.map(category => (
+                                <Category
+                                    key={category.id}
+                                    category={category}
+                                    onToggleCheckpoint={handleToggleCheckpoint}
+                                    onToggleCategory={() => handleToggleCategory(category.id)}
+                                />
+                            ))}
+                        </main>
+                         <footer className="text-center mt-8">
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                                Los datos se guardan localmente en tu navegador.
+                            </p>
+                         </footer>
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
