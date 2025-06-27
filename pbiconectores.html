@@ -1,0 +1,340 @@
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { DndContext, useDraggable, useDroppable } from '@dnd-kit/core';
+import { motion, AnimatePresence } from 'framer-motion';
+
+// --- DATOS DEL JUEGO (Lógica sin cambios) ---
+const CONNECTORS_DATA = {
+  'google-sheets': { id: 'google-sheets', nombre: 'Google Sheets', icono: '📄', tooltip: 'Hojas de cálculo colaborativas en la nube.' },
+  'excel': { id: 'excel', nombre: 'Excel', icono: '📊', tooltip: 'Hojas de cálculo de escritorio y online.' },
+  'sql-server': { id: 'sql-server', nombre: 'SQL Server', icono: '🗄️', tooltip: 'Base de datos relacional de Microsoft.' },
+  'dataverse': { id: 'dataverse', nombre: 'Dataverse', icono: '🌐', tooltip: 'Base de datos para Power Platform y Dynamics 365.' },
+  'sap-hana': { id: 'sap-hana', nombre: 'SAP HANA', icono: '🏢', tooltip: 'Base de datos en memoria para sistemas ERP.' },
+  'salesforce': { id: 'salesforce', nombre: 'Salesforce', icono: '☁️', tooltip: 'Plataforma CRM líder en el mercado.' },
+  'sharepoint': { id: 'sharepoint', nombre: 'SharePoint', icono: '📑', tooltip: 'Plataforma para listas y gestión de documentos.' },
+  'json-file': { id: 'json-file', nombre: 'Archivo JSON', icono: '{}', tooltip: 'Archivos de texto con formato de datos ligeros.' },
+  'pdf-file': { id: 'pdf-file', nombre: 'Archivo PDF', icono: '📰', tooltip: 'Extraer datos de tablas dentro de documentos PDF.' },
+  'azure-sql': { id: 'azure-sql', nombre: 'Azure SQL DB', icono: '☁️🗄️', tooltip: 'Base de datos SQL como servicio en la nube de Microsoft.' },
+  'web-page': { id: 'web-page', nombre: 'Página Web', icono: '🔗', tooltip: 'Extraer datos de tablas en páginas HTML públicas.' },
+  'postgresql': { id: 'postgresql', nombre: 'PostgreSQL', icono: '🐘', tooltip: 'Base de datos relacional de código abierto orientada a objetos.' },
+  'mysql': { id: 'mysql', nombre: 'MySQL', icono: '🐬', tooltip: 'Base de datos relacional de código abierto muy popular en aplicaciones web.' }
+};
+
+const CASES_DATA = [
+  { id: 1, nivel: 1, caso: "Una startup de marketing necesita analizar los resultados de sus campañas, cuyos datos se gestionan y actualizan diariamente en hojas de cálculo compartidas por un equipo pequeño y ágil.", conectores: { 'google-sheets': { puntuacion: 60, tipo: "esencial", feedback: "¡Perfecto! Google Sheets es ideal para la colaboración en tiempo real en equipos pequeños." }, 'excel': { puntuacion: 30, tipo: "complementario", feedback: "Buena opción. Excel es potente, aunque Google Sheets facilita más la colaboración en vivo para este caso." }, 'dataverse': { puntuacion: 10, tipo: "compatible_no_ideal", feedback: "Dataverse podría usarse, pero es una solución más compleja y orientada al ecosistema Power Platform que no es necesaria aquí." }, } },
+  { id: 2, nivel: 2, caso: "Una corporación multinacional quiere consolidar datos de ventas provenientes de su sistema ERP principal y su base de datos de clientes para un análisis de 360 grados.", conectores: { 'sap-hana': { puntuacion: 40, tipo: "esencial", feedback: "¡Correcto! Conectar directamente al ERP como SAP es la fuente primaria y más fiable." }, 'sql-server': { puntuacion: 40, tipo: "esencial", feedback: "¡Muy bien! Conectar a la base de datos de clientes es crucial para la vista 360." }, 'salesforce': { puntuacion: 15, tipo: "complementario", feedback: "Útil. Si el CRM es Salesforce, es un conector vital para complementar los datos del ERP."}, 'excel': { puntuacion: 5, tipo: "compatible_no_ideal", feedback: "Se podrían usar exportaciones de Excel, pero no es una buena práctica para datos corporativos en tiempo real." }, } },
+  { id: 3, nivel: 3, caso: "Un departamento de RRHH almacena los perfiles de los empleados, evaluaciones de desempeño y registros de formación en listas y bibliotecas de documentos dentro de su intranet corporativa.", conectores: { 'sharepoint': { puntuacion: 60, tipo: "esencial", feedback: "¡Exacto! SharePoint es la herramienta nativa para listas y documentos en entornos de Microsoft, ideal para RRHH." }, 'excel': { puntuacion: 30, tipo: "complementario", feedback: "Es común exportar datos de SharePoint a Excel para análisis más detallados. Es un buen complemento." }, 'dataverse': { puntuacion: 10, tipo: "compatible_no_ideal", feedback: "Podría integrarse, pero SharePoint es la fuente de datos directa y más sencilla para este escenario." }, } },
+  { id: 4, nivel: 4, caso: "Un investigador académico necesita extraer datos tabulares de varios artículos científicos que solo están disponibles en formato PDF para realizar un meta-análisis.", conectores: { 'pdf-file': { puntuacion: 70, tipo: "esencial", feedback: "¡Clave! El conector de PDF es la única forma directa de acceder a datos dentro de estos documentos." }, 'excel': { puntuacion: 30, tipo: "complementario", feedback: "Útil. Una vez extraídos los datos, se suelen consolidar en Excel para limpieza antes de cargarlos en Power BI." }, } },
+  { id: 5, nivel: 5, caso: "Una empresa de servicios financieros moderna ha migrado su base de datos transaccional principal a la nube de Microsoft para mejorar la escalabilidad y seguridad. Necesitan dashboards en tiempo real.", conectores: { 'azure-sql': { puntuacion: 70, tipo: "esencial", feedback: "¡Perfecto! Si la base de datos está en Azure, este es el conector nativo y más eficiente." }, 'sql-server': { puntuacion: 30, tipo: "complementario", feedback: "Podría funcionar, pero el conector específico de Azure SQL está más optimizado para la nube." }, } },
+  { id: 6, nivel: 6, caso: "Un analista de mercado necesita monitorear los precios de la competencia. Para ello, debe extraer la información de las tablas de productos directamente desde las páginas web públicas de sus rivales.", conectores: { 'web-page': { puntuacion: 90, tipo: "esencial", feedback: "¡Ideal! El conector Web permite extraer datos estructurados (tablas) directamente desde una URL." }, 'excel': { puntuacion: 10, tipo: "compatible_no_ideal", feedback: "Podrías copiar y pegar los datos a mano en Excel, pero es un proceso manual, lento y propenso a errores." }, } },
+  { id: 7, nivel: 7, caso: "Un equipo de desarrollo de una app móvil almacena todos los logs de interacción de los usuarios en una base de datos PostgreSQL. El equipo de producto quiere visualizar métricas de uso y retención.", conectores: { 'postgresql': { puntuacion: 90, tipo: "esencial", feedback: "¡Correcto! Es el conector directo y adecuado para la base de datos mencionada." }, 'google-sheets': { puntuacion: 10, tipo: "compatible_no_ideal", feedback: "Exportar los logs a hojas de cálculo no es escalable ni eficiente para el análisis de grandes volúmenes de datos." }, } },
+  { id: 8, nivel: 8, caso: "Una tienda online de tamaño medio gestiona todo su catálogo de productos, inventario y órdenes de clientes en una base de datos MySQL, y necesita un dashboard de ventas diarias.", conectores: { 'mysql': { puntuacion: 90, tipo: "esencial", feedback: "¡Exacto! El conector de MySQL es el indicado para conectarse directamente a la base de datos de la tienda." }, 'salesforce': { puntuacion: 10, tipo: "compatible_no_ideal", feedback: "Aunque es un CRM, la fuente principal de datos de ventas según el caso es la base de datos MySQL." }, } }
+];
+
+// --- COMPONENTES VISUALES Y DE JUEGO (Estilo Minimalista) ---
+
+const GradientBorderWrapper = ({ children, className }) => (
+    <div className={`p-1 bg-gradient-to-br from-yellow-400 via-lime-500 to-green-500 rounded-2xl shadow-sm ${className}`}>
+        <div className="bg-white rounded-xl h-full w-full">
+            {children}
+        </div>
+    </div>
+);
+
+const ConnectorCard = ({ id, isDropped }) => {
+  const connector = CONNECTORS_DATA[id];
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id });
+  const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined;
+  
+  return (
+    <motion.div ref={setNodeRef} style={style} {...listeners} {...attributes} layoutId={id} whileHover={{ scale: 1.05, y: -2 }} className={`relative p-3 flex flex-col items-center justify-center bg-white rounded-lg cursor-grab active:cursor-grabbing transition-shadow duration-200 shadow-sm hover:shadow-md border border-gray-200 ${isDragging ? 'shadow-2xl z-50' : ''} ${isDropped ? 'opacity-30' : ''}`}>
+      <div className="text-4xl">{connector.icono}</div>
+      <div className="font-semibold text-gray-700 mt-2 text-center text-sm">{connector.nombre}</div>
+    </motion.div>
+  );
+};
+
+const DropZone = ({ droppedConnectors }) => {
+  const { isOver, setNodeRef } = useDroppable({ id: 'drop-zone' });
+  return (
+    <div ref={setNodeRef} className={`w-full h-full p-4 border-2 border-dashed rounded-xl flex items-center justify-center transition-all duration-300 ${isOver ? 'bg-blue-50 border-blue-400 scale-105' : 'bg-gray-50 border-gray-300'}`}>
+      {!droppedConnectors.length && <div className="text-center text-gray-500"><p className="text-lg font-semibold">Suelta tus conectores aquí</p><p className="text-sm opacity-70">Arrastra las tarjetas desde la izquierda</p></div>}
+      {droppedConnectors.length > 0 && <div className="grid grid-cols-2 md:grid-cols-3 gap-4">{droppedConnectors.map(connId => (<div key={connId} className="p-3 flex flex-col items-center justify-center bg-white rounded-lg shadow-sm border border-gray-200">
+          <div className="text-3xl">{CONNECTORS_DATA[connId].icono}</div><div className="text-xs font-medium text-gray-600 mt-1">{CONNECTORS_DATA[connId].nombre}</div>
+      </div>))}</div>}
+    </div>
+  );
+};
+
+const ScoreModal = ({ results, totalScore, onClose }) => {
+    const getFeedbackMessage = () => {
+        if (totalScore >= 90) return { title: "¡Excelente!", color: "text-green-600" };
+        if (totalScore >= 70) return { title: "¡Muy bien!", color: "text-blue-600" };
+        if (totalScore >= 50) return { title: "¡Buen trabajo!", color: "text-yellow-600" };
+        return { title: "Puedes mejorar", color: "text-red-600" };
+    };
+    const feedback = getFeedbackMessage();
+    const getIconForType = type => ({'esencial': '✅', 'complementario': '👍', 'compatible_no_ideal': '⚠️', 'incorrecto': '❌'}[type] || '');
+    const ScoreDisplay = ({ score }) => {
+        let scoreClass = 'text-gray-500', sign = score > 0 ? '+' : '';
+        if (score > 0) scoreClass = 'text-green-600 font-bold';
+        if (score < 0) scoreClass = 'text-red-600 font-bold';
+        return <span className={scoreClass}>{sign}{score}</span>
+    }
+    return (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <motion.div initial={{ scale: 0.9, y: -20 }} animate={{ scale: 1, y: 0 }} transition={{ type: 'spring', stiffness: 400, damping: 30 }} className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+                <div className="text-center"><h2 className={`text-2xl font-bold mb-2 ${feedback.color}`}>{feedback.title}</h2><p className="text-6xl font-bold text-gray-800 mb-4">{totalScore}<span className="text-2xl text-gray-400">/100</span></p></div>
+                <div className="space-y-3 mb-6 max-h-60 overflow-y-auto p-1 pr-2">{results.map(res => (<div key={res.id} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                    <div className="flex justify-between items-center font-semibold text-gray-800"><span>{getIconForType(res.tipo)} {CONNECTORS_DATA[res.id].nombre}</span><ScoreDisplay score={res.puntuacion} /></div>
+                    <p className="text-sm text-gray-600 mt-1">{res.feedback}</p>
+                </div>))}</div>
+                <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={onClose} className="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg shadow-sm hover:shadow-md transition-shadow">Siguiente Caso</motion.button>
+            </motion.div>
+        </motion.div>
+    );
+};
+
+// --- COMPONENTES DE LÓGICA Y ESTADO ---
+
+const WelcomeScreen = ({ initialName, onStartGame, onShowHistory }) => {
+    const [name, setName] = useState(initialName);
+    const handleStart = () => { if(name.trim()) onStartGame(name); };
+    return (
+        <div className="flex items-center justify-center min-h-screen p-4">
+            <GradientBorderWrapper className="max-w-md w-full">
+                <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="text-center p-8">
+                    <h1 className="text-5xl font-bold text-gray-800 mb-2">Conecta y Gana</h1>
+                    <p className="text-lg text-gray-500 mb-6">Modo Entrenamiento Power BI</p>
+                    <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Escribe tu nombre..." className="w-full p-3 mb-4 bg-gray-50 border border-gray-300 rounded-lg text-center text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={handleStart} disabled={!name.trim()} className="w-full bg-blue-600 text-white font-bold py-3 px-8 rounded-lg shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed">Comenzar Entrenamiento</motion.button>
+                    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={onShowHistory} className="w-full mt-3 bg-gray-200 text-gray-700 font-bold py-2 px-8 rounded-lg transition-colors hover:bg-gray-300">Ver Historial</motion.button>
+                </motion.div>
+            </GradientBorderWrapper>
+        </div>
+    );
+};
+
+const HistoryChart = React.memo(({ history, maxScore }) => {
+    const validHistory = useMemo(() => history.filter(game => 
+        game && typeof game.score === 'number' && typeof game.maxScore === 'number'
+    ), [history]);
+
+    return (
+        <div className="flex items-end h-64 bg-gray-50 p-4 rounded-lg border border-gray-200">
+            {validHistory.map((game, index) => {
+                const percentage = game.maxScore > 0 ? (game.score / game.maxScore) * 100 : 0;
+                return (
+                    <div key={game.date || index} className="flex-1 flex flex-col items-center justify-end group">
+                        <motion.div 
+                            className="w-3/4 bg-gradient-to-b from-yellow-400 via-lime-500 to-green-500 rounded-t-md" 
+                            initial={{ height: 0 }} 
+                            animate={{ height: `${percentage}%` }}
+                            transition={{ duration: 0.5, delay: index * 0.05 }}
+                        >
+                            <div className="opacity-0 group-hover:opacity-100 text-center text-xs font-bold text-white bg-black/50 p-1 rounded-md -mt-8">{game.score}</div>
+                        </motion.div>
+                        <div className="text-xs text-gray-500 mt-2">{index + 1}</div>
+                    </div>
+                );
+            })}
+        </div>
+    );
+});
+
+
+const HistoryScreen = ({ history, onBack, maxPossibleScore }) => (
+    <div className="p-4 lg:p-8">
+        <h1 className="text-4xl font-bold text-center text-gray-800 mb-8">Historial de Partidas</h1>
+        <GradientBorderWrapper className="max-w-4xl mx-auto">
+             <div className="p-6">
+                <h2 className="text-2xl font-bold text-gray-700 mb-4">Progreso General</h2>
+                {history.length > 0 ? (
+                    <>
+                        <HistoryChart history={history} maxScore={maxPossibleScore} />
+                        <ul className="mt-6 space-y-2 max-h-48 overflow-y-auto pr-2">{[...history].reverse().map((game) => (
+                            <li key={game.date} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-200">
+                                <span className="font-semibold text-gray-800">{game.playerName}</span>
+                                <span className="text-gray-500 text-sm">{new Date(game.date).toLocaleDateString()}</span>
+                                <span className="font-bold text-blue-600">{game.score} Puntos</span>
+                            </li>
+                        ))}</ul>
+                    </>
+                ) : <p className="text-center text-gray-500">Aún no hay partidas guardadas.</p>}
+            </div>
+        </GradientBorderWrapper>
+        <div className="text-center mt-8"><motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={onBack} className="bg-gray-200 text-gray-700 font-bold py-2 px-8 rounded-lg hover:bg-gray-300">Volver al Inicio</motion.button></div>
+    </div>
+);
+
+// Componente Principal de la Aplicación
+export default function App() {
+  const [gameState, setGameState] = useState('welcome');
+  const [history, setHistory] = useState([]);
+  const [currentPlayer, setCurrentPlayer] = useState('');
+  
+  const [currentCaseIndex, setCurrentCaseIndex] = useState(0);
+  const [totalScore, setTotalScore] = useState(0);
+  const [droppedConnectors, setDroppedConnectors] = useState([]);
+  const [roundResults, setRoundResults] = useState([]);
+  
+  useEffect(() => {
+    try {
+      const storedHistory = localStorage.getItem('conectaGanaHistory');
+      const storedName = localStorage.getItem('conectaGanaPlayerName');
+      if (storedHistory) setHistory(JSON.parse(storedHistory));
+      if (storedName) setCurrentPlayer(storedName);
+    } catch (error) {
+      console.error("Failed to parse localStorage data:", error);
+      localStorage.removeItem('conectaGanaHistory');
+      localStorage.removeItem('conectaGanaPlayerName');
+    }
+  }, []);
+
+  useEffect(() => { if (gameState !== 'playing') window.scrollTo(0, 0); }, [gameState]);
+
+  const saveGame = useCallback((finalScore, playerName) => {
+    const newEntry = { playerName, score: finalScore, date: new Date().toISOString(), maxScore: CASES_DATA.length * 100 };
+    const updatedHistory = [...history, newEntry];
+    setHistory(updatedHistory);
+    localStorage.setItem('conectaGanaHistory', JSON.stringify(updatedHistory));
+    localStorage.setItem('conectaGanaPlayerName', playerName);
+  }, [history]);
+  
+  const currentCase = CASES_DATA[currentCaseIndex];
+  const maxPossibleScore = CASES_DATA.length * 100;
+  const goalScore = maxPossibleScore * 0.7; 
+  const pointsNeeded = Math.max(0, goalScore - totalScore);
+
+  const handleDragEnd = (event) => {
+    const { active, over } = event;
+    if (over && over.id === 'drop-zone' && !droppedConnectors.includes(active.id)) {
+      setDroppedConnectors(prev => [...prev, active.id]);
+    }
+  };
+
+  const handleEvaluate = () => {
+    let score = 0;
+    const results = droppedConnectors.map(id => {
+        const connectorRule = currentCase.conectores[id];
+        if (connectorRule) { score += connectorRule.puntuacion; return { id, ...connectorRule }; }
+        score -= 10; return { id, puntuacion: -10, tipo: 'incorrecto', feedback: 'Este conector no es aplicable o relevante para este caso.' };
+    });
+    
+    const finalScore = Math.max(0, score);
+    setRoundResults(results);
+    setTotalScore(prev => prev + finalScore);
+    setGameState('evaluation');
+  };
+  
+  const handleNextCase = () => {
+    if (currentCaseIndex < CASES_DATA.length - 1) {
+      setGameState('playing'); setCurrentCaseIndex(prev => prev + 1); setDroppedConnectors([]);
+    } else {
+      saveGame(totalScore, currentPlayer); setGameState('finished');
+    }
+  };
+
+  const startGame = (playerName) => {
+    setCurrentPlayer(playerName);
+    setGameState('playing');
+    setCurrentCaseIndex(0);
+    setTotalScore(0);
+    setDroppedConnectors([]);
+  };
+
+  const finalPerformance = useMemo(() => {
+    if (gameState !== 'finished' || history.length === 0) return null;
+    const lastGame = history[history.length - 1];
+    const score = lastGame.score || 0;
+    const maxScore = lastGame.maxScore || maxPossibleScore;
+    const percentage = maxScore > 0 ? (score / maxScore) * 100 : 0;
+    
+    if (percentage >= 70) return { title: "¡Felicidades! Reto Superado", emoji: "🏆", message: "Demostraste un excelente conocimiento.", passed: true};
+    return { title: "¡Casi lo logras!", emoji: "💪", message: "¡Sigue practicando para alcanzar el 70%!", passed: false };
+  }, [gameState, history]);
+
+  const PointsToGoalTracker = () => {
+    const percentageToGoal = totalScore >= goalScore ? 100 : (totalScore / goalScore) * 100;
+    return (
+        <div className="p-3 rounded-lg mt-4 text-center bg-gray-100 border border-gray-200">
+            <div className="font-semibold text-sm text-gray-600 tracking-wider">META DEL ENTRENAMIENTO</div>
+            <div className="w-full bg-gray-200 rounded-full h-2.5 my-2">
+              <motion.div className="bg-gradient-to-r from-yellow-400 via-lime-500 to-green-500 h-2.5 rounded-full" style={{ width: `${percentageToGoal}%` }} animate={{width: `${percentageToGoal}%`}} transition={{ duration: 0.5, ease: "easeInOut" }}/>
+            </div>
+             <div className="text-xs text-gray-500">{totalScore >= goalScore ? "¡Meta alcanzada!" : `Faltan ${pointsNeeded} puntos para el 70%`}</div>
+        </div>
+    );
+  }
+
+  const PageWrapper = ({ children }) => ( 
+      <div className="w-full min-h-screen bg-gray-100 text-gray-800 font-sans relative pb-12">
+          <div className="min-h-screen">
+            {children}
+          </div>
+          <footer className="absolute bottom-0 left-0 right-0 p-4 text-center text-xs text-gray-400">
+              <p>Diseñado por <strong>sevenreasoons</strong> | <a href="https://www.sevenreasoons.com" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">www.sevenreasoons.com</a></p>
+          </footer>
+      </div>
+  );
+
+  const renderGameState = () => {
+    switch(gameState) {
+      case 'welcome':
+        return <WelcomeScreen initialName={currentPlayer} onStartGame={startGame} onShowHistory={() => setGameState('history')} />;
+      case 'history':
+        return <HistoryScreen history={history} onBack={() => setGameState('welcome')} maxPossibleScore={maxPossibleScore} />;
+      case 'finished':
+          const lastGame = history[history.length - 1];
+          if (!lastGame || !finalPerformance) return null;
+          const score = Number(lastGame.score) || 0;
+          const maxScore = Number(lastGame.maxScore) || maxPossibleScore;
+          const percentage = maxScore > 0 ? (score / maxScore) * 100 : 0;
+        return (
+          <div className="flex items-center justify-center min-h-screen p-4">
+              <GradientBorderWrapper className="max-w-lg w-full">
+                <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="text-center p-8">
+                  <div className="text-7xl mb-4">{finalPerformance.emoji}</div><h1 className="text-4xl font-bold text-gray-800 mb-2">{finalPerformance.title}</h1><p className="text-gray-600 mb-6">{finalPerformance.message}</p>
+                  <div className={`p-4 rounded-lg mb-6 ${finalPerformance.passed ? 'bg-green-50' : 'bg-red-50'} border ${finalPerformance.passed ? 'border-green-200' : 'border-red-200'}`}>
+                    <div className="text-lg font-semibold mb-2">Resumen de Puntuación</div>
+                    <div className="flex justify-between text-gray-700"><span>Puntuación Obtenida:</span> <span className="font-bold">{score}</span></div>
+                    <div className="flex justify-between text-gray-700"><span>Puntuación Máxima:</span> <span className="font-bold">{maxScore}</span></div>
+                    <div className="w-full bg-gray-200 rounded-full h-4 my-2"><div className="bg-gradient-to-r from-yellow-400 via-lime-500 to-green-500 h-4 rounded-full" style={{ width: `${percentage}%` }}></div></div>
+                    <div className="text-right font-bold text-xl text-gray-700">{percentage.toFixed(0)}% de Acierto</div>
+                  </div>
+                  <div className="flex space-x-4">
+                    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => startGame(currentPlayer)} className="flex-1 bg-blue-600 text-white font-bold py-3 px-8 rounded-lg shadow-sm hover:shadow-md">Jugar de Nuevo</motion.button>
+                    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => setGameState('history')} className="flex-1 bg-gray-200 text-gray-700 font-bold py-3 px-8 rounded-lg hover:bg-gray-300">Ver Historial</motion.button>
+                  </div>
+                </motion.div>
+            </GradientBorderWrapper>
+          </div>
+        );
+      default: // 'playing'
+        return (
+          <DndContext onDragEnd={handleDragEnd}>
+            <div className="p-4 lg:p-8">
+              <header className="text-center mb-6 max-w-7xl mx-auto">
+                <div className="flex justify-between items-center text-gray-600"><div className="text-left w-1/4"><span className="font-semibold">Ronda:</span> {currentCaseIndex + 1}/{CASES_DATA.length}</div>
+                <h1 className="text-4xl font-bold text-gray-800 w-1/2">Caso {currentCase.id}</h1><div className="text-right w-1/4"><span className="font-semibold">Puntuación:</span> {totalScore}</div></div>
+                <PointsToGoalTracker />
+              </header>
+              <main className="grid grid-cols-1 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
+                <GradientBorderWrapper><div className="p-4"><h2 className="text-xl font-bold text-center text-gray-700 mb-4">Conectores</h2><div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-2 gap-4">{Object.keys(CONNECTORS_DATA).map(connId => <ConnectorCard key={connId} id={connId} isDropped={droppedConnectors.includes(connId)} />)}</div></div></GradientBorderWrapper>
+                <div className="lg:col-span-3"><GradientBorderWrapper><div className="p-6 flex flex-col h-full">
+                  <div className="mb-4 p-4 bg-blue-50 border-l-4 border-blue-500 rounded-r-lg"><h3 className="font-bold text-lg text-gray-800 mb-2">Caso de Uso Empresarial</h3><p className="text-gray-700">{currentCase.caso}</p></div>
+                  <div className="flex-grow min-h-[250px] lg:min-h-[300px]"><DropZone droppedConnectors={droppedConnectors} /></div>
+                  <div className="mt-6 flex justify-center items-center space-x-4">
+                    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => setDroppedConnectors([])} disabled={!droppedConnectors.length} className="bg-red-600 text-white font-bold py-3 px-8 rounded-lg shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed">Limpiar</motion.button>
+                    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={handleEvaluate} disabled={!droppedConnectors.length} className="bg-green-600 text-white font-bold py-3 px-12 rounded-lg shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed">Evaluar</motion.button>
+                  </div>
+                </div></GradientBorderWrapper></div>
+              </main>
+              <AnimatePresence>{gameState === 'evaluation' && <ScoreModal results={roundResults} totalScore={Math.max(0,roundResults.reduce((acc, r) => acc + r.puntuacion, 0))} onClose={handleNextCase} />}</AnimatePresence>
+            </div>
+          </DndContext>
+        );
+    }
+  }
+
+  return <PageWrapper>{renderGameState()}</PageWrapper>;
+}
