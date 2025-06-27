@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control de Producción CNC</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700;900&display=swap" rel="stylesheet">
+    
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        /* Custom Styles */
+        body {
+            font-family: 'Roboto', sans-serif;
+        }
+        .animate-spin-slow {
+            animation: spin 3s linear infinite;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .tabular-nums {
+            font-variant-numeric: tabular-nums;
+        }
+        /* Scrollbar styling */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #1a202c; /* gray-900 */
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #4a5568; /* gray-600 */
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #718096; /* gray-500 */
+        }
+        /* Modal Styles */
+        #modal-container {
+            transition: opacity 0.3s ease;
+        }
+        /* Style for selected downtime reason */
+        .reason-selected {
+            background-color: #4a5568; /* gray-600 */
+            --tw-ring-color: #38b2ac; /* cyan-500 */
+            --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);
+            --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color);
+            box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000);
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white">
+
+    <main id="app" class="min-h-screen w-full flex items-center justify-center p-2 sm:p-4">
+        <!-- App content will be rendered here by JavaScript -->
+    </main>
+    <div id="modal-container" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 hidden z-50">
+        <!-- Modal content will be rendered here -->
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const app = document.getElementById('app');
+            const modalContainer = document.getElementById('modal-container');
+            let stopwatchInterval;
+            let downtimeStopwatchInterval;
+
+            let state = {
+                screen: 'login', // login, machine_selection, order_selection, piece_counter, history, downtime_tracking
+                userName: '',
+                selectedMachine: null,
+                allOrders: {}, // { machineId: { active: [], finished: [] } }
+                selectedOrder: null,
+                activeDowntime: null, // Holds the currently running downtime object
+                feedbackMessage: ''
+            };
+            
+            // --- DATA & STATE ---
+            const DOWNTIME_REASONS = {
+                "Paro Planeado": ["Cambio de herramienta", "Mantenimiento programado", "Limpieza", "Ajuste de programa", "Inspección de calidad"],
+                "Paro No Planeado": ["Falla de herramienta", "Falla de máquina", "Falta de material", "Error de programa", "Falta de operador"]
+            };
+
+            const saveState = () => {
+                const stateToSave = { userName: state.userName, allOrders: state.allOrders };
+                localStorage.setItem('cncAppStateV3', JSON.stringify(stateToSave));
+            };
+
+            const loadState = () => {
+                const savedState = localStorage.getItem('cncAppStateV3');
+                if (savedState) {
+                    const parsedState = JSON.parse(savedState);
+                    state.userName = parsedState.userName || '';
+                    state.allOrders = parsedState.allOrders || {};
+
+                    // **FIX**: Ensure data backward compatibility
+                    Object.values(state.allOrders).forEach(machine => {
+                        if (machine.active) {
+                            machine.active.forEach(order => {
+                                if (!order.downtimes) order.downtimes = [];
+                            });
+                        }
+                        if (machine.finished) {
+                            machine.finished.forEach(order => {
+                                if (!order.downtimes) order.downtimes = [];
+                            });
+                        }
+                    });
+
+                    if (state.userName) {
+                        state.screen = 'machine_selection';
+                    }
+                }
+            };
+            
+            const generateProductionOrders = () => Array.from({ length: 10 }, (_, i) => ({
+                id: Date.now() + i, partNumber: `PN-74B-${Math.floor(1000 + Math.random() * 9000)}`,
+                piecesPerHour: Math.floor(Math.random() * (75 - 20 + 1)) + 20,
+                totalPieces: 0, history: [], startTime: null, stopTime: null, downtimes: []
+            }));
+
+            // --- UTILITY FUNCTIONS ---
+            const formatDuration = (ms) => {
+                if (ms < 0) ms = 0;
+                const totalSeconds = Math.floor(ms / 1000);
+                const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
+                const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
+                const seconds = String(totalSeconds % 60).padStart(2, '0');
+                return `${hours}:${minutes}:${seconds}`;
+            };
+            
+            const calculateAverageTime = (history) => {
+                 if (history.length < 2) return 'N/A';
+                let totalDiff = 0;
+                for (let i = 1; i < history.length; i++) {
+                    const diff = new Date(history[i].time) - new Date(history[i-1].time);
+                    totalDiff += diff;
+                }
+                const avgMs = totalDiff / (history.length - 1);
+                return formatDuration(avgMs);
+            };
+
+            // --- MODAL FUNCTIONS ---
+            const showModal = (title, message, onConfirm, confirmText = 'Confirmar', cancelText = 'Cancelar') => {
+                 modalContainer.innerHTML = `
+                    <div class="bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-sm text-center">
+                        <h3 class="text-xl font-bold text-white mb-2">${title}</h3>
+                        <p class="text-gray-300 mb-6">${message}</p>
+                        <div class="flex justify-center gap-4">
+                            <button id="modal-cancel" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg">${cancelText}</button>
+                            <button id="modal-confirm" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg">${confirmText}</button>
+                        </div>
+                    </div>
+                `;
+                modalContainer.classList.remove('hidden');
+                document.getElementById('modal-confirm').onclick = () => { onConfirm(); hideModal(); };
+                document.getElementById('modal-cancel').onclick = hideModal;
+            };
+            const hideModal = () => { modalContainer.classList.add('hidden'); modalContainer.innerHTML = ''; };
+
+            // --- RENDER FUNCTIONS (ALL ARE NOW FULLY DEFINED) ---
+            const renderLogin = () => `
+                <div class="w-full max-w-md mx-auto">
+                    <div class="bg-gray-800 p-8 rounded-2xl shadow-2xl text-center">
+                        <i data-lucide="cog" class="w-16 h-16 text-cyan-400 mx-auto mb-4 animate-spin-slow"></i>
+                        <h1 class="text-3xl font-bold text-white mb-2">Control de Producción CNC</h1>
+                        <p class="text-gray-400 mb-6">Bienvenido. Por favor, ingrese su nombre.</p>
+                        <form id="login-form">
+                            <div class="relative mb-4">
+                                <i data-lucide="user" class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                                <input type="text" id="username-input" placeholder="Nombre del Operador" class="w-full bg-gray-700 text-white border-2 border-gray-600 rounded-lg py-3 pl-12 pr-4 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition" required />
+                            </div>
+                            <button type="submit" class="w-full bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-transform transform hover:scale-105">
+                                Ingresar <i data-lucide="chevrons-right"></i>
+                            </button>
+                        </form>
+                    </div>
+                </div>`;
+            
+            const renderMachineSelection = () => `
+                <div class="w-full max-w-4xl mx-auto">
+                    <div class="bg-gray-800 p-6 md:p-8 rounded-2xl shadow-2xl">
+                        <div class="flex justify-between items-center mb-6">
+                            <h1 class="text-xl md:text-2xl font-bold text-white">Hola, ${state.userName}</h1>
+                            <button data-action="logout" class="text-sm text-cyan-400 hover:underline flex items-center gap-1">
+                                <i data-lucide="log-out" class="w-4 h-4"></i> Cambiar Operador
+                            </button>
+                        </div>
+                        <h2 class="text-xl text-cyan-400 font-semibold mb-4 text-center">Seleccione una Máquina CNC</h2>
+                        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+                            ${Array.from({ length: 10 }, (_, i) => i + 1).map(id => `
+                                <button data-action="select-machine" data-id="${id}" class="aspect-square bg-gray-700 hover:bg-cyan-500 hover:text-white transition-all duration-300 rounded-lg flex flex-col items-center justify-center shadow-lg transform hover:-translate-y-1 group">
+                                    <i data-lucide="factory" class="w-10 h-10 text-gray-400 group-hover:text-white mb-2 transition-colors"></i>
+                                    <span class="text-lg font-bold text-white">CNC-${String(id).padStart(2, '0')}</span>
+                                </button>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>`;
+            
+            const renderOrderSelection = () => {
+                const machineOrders = state.allOrders[state.selectedMachine] || { active: [], finished: [] };
+                return `
+                <div class="w-full max-w-4xl mx-auto">
+                    <div class="bg-gray-800 p-6 md:p-8 rounded-2xl shadow-2xl">
+                        <div class="flex justify-between items-center mb-4">
+                            <h1 class="text-xl md:text-2xl font-bold">Máquina CNC-${String(state.selectedMachine).padStart(2, '0')}</h1>
+                            <button data-action="go-back" data-screen="machine_selection" class="text-sm text-cyan-400 hover:underline flex items-center gap-1">
+                                <i data-lucide="arrow-left" class="w-4 h-4"></i> Volver
+                            </button>
+                        </div>
+                        <div class="flex justify-between items-center mb-6 border-b-2 border-gray-700 pb-4">
+                            <h2 class="text-lg md:text-xl text-cyan-400 font-semibold">Órdenes Activas</h2>
+                            <button data-action="view-history" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2 transition-transform transform hover:scale-105">
+                                <i data-lucide="history"></i> Historial
+                            </button>
+                        </div>
+                        <div class="space-y-3">
+                            ${machineOrders.active.length === 0 ? `<p class="text-center text-gray-400 py-4">No hay órdenes activas.</p>` : 
+                              machineOrders.active.map(order => `
+                                <div data-action="select-order" data-id="${order.id}" class="bg-gray-700 p-4 rounded-lg flex items-center justify-between cursor-pointer hover:bg-gray-600 hover:ring-2 hover:ring-cyan-500 transition-all shadow">
+                                    <div class="flex items-center gap-4">
+                                       <i data-lucide="list-ordered" class="w-8 h-8 text-cyan-400"></i>
+                                       <div>
+                                           <p class="font-bold text-lg">N/P: ${order.partNumber}</p>
+                                           <p class="text-sm text-gray-300">Objetivo: ${order.piecesPerHour} pzas/hr</p>
+                                       </div>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="font-bold text-xl">${order.totalPieces}</p>
+                                        <p class="text-sm text-gray-400">Piezas</p>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>`;
+            };
+            
+            const renderHistory = () => {
+                const machineOrders = state.allOrders[state.selectedMachine] || { active: [], finished: [] };
+                return `
+                <div class="w-full max-w-5xl mx-auto">
+                    <div class="bg-gray-800 p-6 md:p-8 rounded-2xl shadow-2xl">
+                        <div class="flex justify-between items-center mb-6 border-b-2 border-gray-700 pb-4">
+                            <h1 class="text-xl md:text-2xl font-bold">Historial de Órdenes Finalizadas</h1>
+                            <button data-action="go-back" data-screen="order_selection" class="text-sm text-cyan-400 hover:underline flex items-center gap-1"><i data-lucide="arrow-left" class="w-4 h-4"></i> Volver a Órdenes</button>
+                        </div>
+                        <div class="space-y-4 max-h-[70vh] overflow-y-auto custom-scrollbar pr-2">
+                            ${machineOrders.finished.length === 0 ? `<p class="text-center text-gray-400 py-8">No hay órdenes finalizadas.</p>` :
+                              [...machineOrders.finished].reverse().map(order => {
+                                const durationMs = order.stopTime - order.startTime;
+                                const durationHours = durationMs / (1000 * 60 * 60);
+                                const expectedPieces = Math.floor(durationHours * order.piecesPerHour);
+                                const efficiency = expectedPieces > 0 ? (order.totalPieces / expectedPieces) * 100 : 0;
+                                const effColor = efficiency >= 95 ? 'text-green-400' : efficiency >= 80 ? 'text-yellow-400' : 'text-red-400';
+                                return `<div class="bg-gray-700 p-4 rounded-lg shadow"><div class="flex justify-between items-start mb-3"><div><p class="font-bold text-lg">${order.partNumber}</p><p class="text-xs text-gray-400">Finalizada: ${new Date(order.stopTime).toLocaleString()}</p></div><div class="text-right"><p class="font-bold text-lg ${effColor}">${efficiency.toFixed(1)}%</p><p class="text-xs text-gray-400">Eficiencia</p></div></div><div class="grid grid-cols-3 gap-4 text-center bg-gray-900/50 p-3 rounded-md"><div><p class="font-bold text-xl">${order.totalPieces}</p><p class="text-sm text-gray-300">Producidas</p></div><div><p class="font-bold text-xl">${expectedPieces}</p><p class="text-sm text-gray-300">Esperadas</p></div><div><p class="font-bold text-xl">${formatDuration(durationMs)}</p><p class="text-sm text-gray-300">Duración</p></div></div></div>`
+                            }).join('')}
+                        </div>
+                    </div>
+                </div>`;
+            };
+
+            const renderPieceCounter = () => {
+                const order = state.selectedOrder;
+                if (!order) return '';
+                
+                const totalDowntimeMs = order.downtimes.reduce((acc, dt) => acc + (dt.stopTime ? dt.stopTime - dt.startTime : 0), 0);
+                const isDowntimeActive = state.activeDowntime !== null;
+                const activeDowntimeMs = isDowntimeActive ? Date.now() - state.activeDowntime.startTime : 0;
+                const effectiveElapsedTime = order.startTime ? (Date.now() - order.startTime) - (totalDowntimeMs + activeDowntimeMs) : 0;
+
+                if (!isDowntimeActive) {
+                    stopwatchInterval = setInterval(() => {
+                       const el = document.getElementById('stopwatch');
+                       if(el) {
+                           const currentTotalDowntimeMs = state.selectedOrder.downtimes.reduce((acc, dt) => acc + (dt.stopTime ? dt.stopTime - dt.startTime : 0), 0);
+                           const currentActiveDowntimeMs = state.activeDowntime ? Date.now() - state.activeDowntime.startTime : 0;
+                           el.textContent = formatDuration((Date.now() - state.selectedOrder.startTime) - (currentTotalDowntimeMs + currentActiveDowntimeMs));
+                       }
+                    }, 1000);
+                }
+
+                return `
+                <div class="w-full max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Left Panel: Counter and Actions -->
+                    <div class="bg-gray-800 p-6 rounded-2xl shadow-2xl flex flex-col lg:col-span-1">
+                        <div class="flex justify-between items-center mb-4"><h1 class="text-xl font-bold">Orden Activa</h1><button data-action="go-back" data-screen="order_selection" class="text-sm text-cyan-400 hover:underline flex items-center gap-1"><i data-lucide="arrow-left" class="w-4 h-4"></i> Volver</button></div>
+                        <div class="bg-gray-900 p-4 rounded-xl mb-4 text-center shadow-inner">
+                             <p class="text-gray-400 text-sm">N/P: <span class="font-bold text-white text-lg">${order.partNumber}</span></p>
+                        </div>
+                        <div class="text-center my-4 flex-grow flex flex-col justify-center">
+                            <p class="text-gray-300 text-lg">Total Piezas</p>
+                            <p class="text-8xl font-bold text-cyan-400 tabular-nums">${order.totalPieces}</p>
+                            <p class="text-gray-400 mt-2">Tiempo de Producción</p>
+                            <div id="stopwatch" class="text-2xl text-amber-400 tabular-nums">${formatDuration(effectiveElapsedTime)}</div>
+                        </div>
+                        <div class="grid grid-cols-1 gap-4 mt-4">
+                            <button data-action="count-piece" ${isDowntimeActive ? 'disabled' : ''} class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-5 px-4 rounded-xl flex items-center justify-center gap-3 transition-transform transform hover:scale-105 shadow-xl disabled:bg-gray-500 disabled:cursor-not-allowed"><i data-lucide="plus-circle" class="w-8 h-8"></i><span class="text-2xl">CONTAR PIEZA</span></button>
+                            <button data-action="start-downtime" ${isDowntimeActive ? 'disabled' : ''} class="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-transform transform hover:scale-105 disabled:bg-gray-500 disabled:cursor-not-allowed"><i data-lucide="timer-off" class="w-6 h-6"></i> Iniciar Paro</button>
+                            <button data-action="finalize-order" ${isDowntimeActive ? 'disabled' : ''} class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-transform transform hover:scale-105 disabled:bg-gray-500 disabled:cursor-not-allowed"><i data-lucide="flag-off" class="w-6 h-6"></i> Finalizar Orden</button>
+                        </div>
+                        <div id="feedback-message" class="mt-4 text-center text-green-400 bg-green-900/50 p-2 rounded-lg ${state.feedbackMessage ? '' : 'hidden'}">${state.feedbackMessage}</div>
+                    </div>
+                    <!-- Middle Panel: History -->
+                    <div class="bg-gray-800 p-6 rounded-2xl shadow-2xl lg:col-span-1">
+                        <h2 class="text-xl font-bold mb-2">Historial de Piezas</h2>
+                        <div id="piece-history" class="h-96 lg:h-full overflow-y-auto custom-scrollbar bg-gray-900 rounded-lg p-3 space-y-2">
+                             ${order.history.length === 0 ? `<p class="text-center text-gray-500 pt-10">No hay piezas registradas.</p>` : [...order.history].reverse().map(p => `<div class="bg-gray-700 rounded-md p-2 flex justify-between items-center text-sm"><span class="font-bold text-cyan-300">Pieza #${p.count}</span><span class="text-gray-300">${new Date(p.time).toLocaleTimeString()}</span></div>`).join('')}
+                        </div>
+                    </div>
+                    <!-- Right Panel: Downtime History -->
+                    <div class="bg-gray-800 p-6 rounded-2xl shadow-2xl lg:col-span-1">
+                        <h2 class="text-xl font-bold mb-2">Historial de Paros</h2>
+                        <div id="downtime-history" class="h-96 lg:h-full overflow-y-auto custom-scrollbar bg-gray-900 rounded-lg p-3 space-y-2">
+                            ${order.downtimes.length === 0 ? `<p class="text-center text-gray-500 pt-10">No hay paros registrados.</p>` : [...order.downtimes].reverse().map(dt => `<div class="bg-gray-700 rounded-md p-2 text-sm"><div class="flex justify-between items-center font-bold"><span class="text-amber-300">${dt.reason}</span><span>${formatDuration(dt.stopTime - dt.startTime)}</span></div><p class="text-xs text-gray-400">${dt.category}</p></div>`).join('')}
+                        </div>
+                    </div>
+                </div>`;
+            };
+
+            const renderDowntimeTracking = () => {
+                const downtime = state.activeDowntime;
+                if (!downtime) return '';
+                
+                downtimeStopwatchInterval = setInterval(() => {
+                    const el = document.getElementById('downtime-stopwatch');
+                    if(el) el.textContent = formatDuration(Date.now() - downtime.startTime);
+                }, 1000);
+
+                return `
+                <div class="w-full max-w-2xl mx-auto">
+                    <div class="bg-gray-800 p-6 md:p-8 rounded-2xl shadow-2xl text-center">
+                        <i data-lucide="timer-off" class="w-16 h-16 text-amber-400 mx-auto mb-4"></i>
+                        <h1 class="text-3xl font-bold text-white mb-2">Registro de Paro</h1>
+                        <p class="text-gray-400 mb-6">El tiempo de producción está en pausa.</p>
+                        
+                        <div id="downtime-stopwatch" class="text-6xl font-bold text-amber-400 tabular-nums mb-6">${formatDuration(Date.now() - downtime.startTime)}</div>
+
+                        <div class="space-y-4 text-left">
+                            ${Object.entries(DOWNTIME_REASONS).map(([category, reasons]) => `
+                                <div>
+                                    <h3 class="font-bold text-lg text-cyan-400 mb-2">${category}</h3>
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        ${reasons.map(reason => `
+                                            <button data-action="select-downtime-reason" data-category="${category}" data-reason="${reason}" class="text-left p-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition ${downtime.reason === reason ? 'reason-selected' : ''}">
+                                                ${reason}
+                                            </button>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+
+                        <button data-action="end-downtime" ${!downtime.reason ? 'disabled' : ''} class="w-full mt-8 bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-4 rounded-xl flex items-center justify-center gap-2 transition-transform transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">
+                            <i data-lucide="timer" class="w-6 h-6"></i> Cerrar Paro y Reanudar
+                        </button>
+                    </div>
+                </div>
+                `;
+            };
+
+            // --- MAIN RENDER FUNCTION ---
+            const renderApp = () => {
+                let content = '';
+                clearInterval(stopwatchInterval);
+                clearInterval(downtimeStopwatchInterval);
+                
+                const renderFunctions = {
+                    login: renderLogin,
+                    machine_selection: renderMachineSelection,
+                    order_selection: renderOrderSelection,
+                    piece_counter: renderPieceCounter,
+                    history: renderHistory,
+                    downtime_tracking: renderDowntimeTracking,
+                };
+
+                content = renderFunctions[state.screen] ? renderFunctions[state.screen]() : renderLogin();
+                app.innerHTML = content;
+                lucide.createIcons();
+            };
+
+            // --- EVENT LISTENERS ---
+            app.addEventListener('submit', e => {
+                if (e.target.id === 'login-form') {
+                    e.preventDefault();
+                    const userNameInput = document.getElementById('username-input');
+                    if (userNameInput.value.trim()) {
+                        state.userName = userNameInput.value.trim();
+                        state.screen = 'machine_selection';
+                        saveState();
+                        renderApp();
+                    }
+                }
+            });
+
+            app.addEventListener('click', e => {
+                const target = e.target.closest('[data-action]');
+                if (!target) return;
+
+                const action = target.dataset.action;
+                
+                switch(action) {
+                    case 'logout':
+                        localStorage.removeItem('cncAppStateV3');
+                        state = { screen: 'login', userName: '', selectedMachine: null, allOrders: {}, selectedOrder: null, activeDowntime: null, feedbackMessage: ''};
+                        renderApp();
+                        break;
+                    case 'go-back': 
+                        state.screen = target.dataset.screen;
+                        renderApp(); 
+                        break;
+                    case 'select-machine':
+                        const machineId = target.dataset.id;
+                        if (!state.allOrders[machineId] || (state.allOrders[machineId].active.length === 0 && state.allOrders[machineId].finished.length === 0)) {
+                            state.allOrders[machineId] = { active: generateProductionOrders(), finished: [] };
+                        }
+                        state.selectedMachine = machineId;
+                        state.screen = 'order_selection';
+                        saveState();
+                        renderApp();
+                        break;
+                    case 'select-order':
+                        const orderId = parseInt(target.dataset.id, 10);
+                        state.selectedOrder = state.allOrders[state.selectedMachine].active.find(o => o.id === orderId);
+                        if (state.selectedOrder && !state.selectedOrder.startTime) {
+                            state.selectedOrder.startTime = Date.now();
+                        }
+                        state.screen = 'piece_counter';
+                        renderApp();
+                        break;
+                    case 'view-history': 
+                        state.screen = 'history';
+                        renderApp();
+                        break;
+                    case 'count-piece':
+                        if (state.activeDowntime) return;
+                        const now = new Date();
+                        const updatedOrder = {
+                            ...state.selectedOrder,
+                            totalPieces: state.selectedOrder.totalPieces + 1,
+                            history: [...state.selectedOrder.history, { count: state.selectedOrder.totalPieces + 1, time: now.toISOString() }],
+                        };
+                        state.selectedOrder = updatedOrder;
+                        const orderIndexCount = state.allOrders[state.selectedMachine].active.findIndex(o => o.id === updatedOrder.id);
+                        if(orderIndexCount !== -1) state.allOrders[state.selectedMachine].active[orderIndexCount] = updatedOrder;
+                        
+                        state.feedbackMessage = `Pieza #${updatedOrder.totalPieces} registrada a las ${now.toLocaleTimeString()}`;
+                        saveState();
+                        renderApp();
+
+                        setTimeout(() => {
+                            state.feedbackMessage = '';
+                            const feedbackEl = document.getElementById('feedback-message');
+                            if (feedbackEl) feedbackEl.classList.add('hidden');
+                        }, 2000);
+                        break;
+                    case 'start-downtime':
+                        if (state.activeDowntime) return;
+                        state.activeDowntime = { id: Date.now(), startTime: Date.now(), stopTime: null, reason: null, category: null };
+                        state.screen = 'downtime_tracking';
+                        renderApp();
+                        break;
+                    case 'select-downtime-reason':
+                        if(state.activeDowntime) {
+                            state.activeDowntime.reason = target.dataset.reason;
+                            state.activeDowntime.category = target.dataset.category;
+                            renderApp();
+                        }
+                        break;
+                    case 'end-downtime':
+                        if (!state.activeDowntime || !state.activeDowntime.reason) {
+                            showModal('Error', 'Debe seleccionar un motivo de paro antes de continuar.', () => {}, 'Entendido', 'Cerrar');
+                            return;
+                        }
+                        state.activeDowntime.stopTime = Date.now();
+                        state.selectedOrder.downtimes.push(state.activeDowntime);
+                        state.activeDowntime = null;
+                        
+                        const orderIndexEnd = state.allOrders[state.selectedMachine].active.findIndex(o => o.id === state.selectedOrder.id);
+                        if(orderIndexEnd !== -1) state.allOrders[state.selectedMachine].active[orderIndexEnd] = state.selectedOrder;
+
+                        state.screen = 'piece_counter';
+                        saveState();
+                        renderApp();
+                        break;
+                    case 'finalize-order':
+                        if (state.activeDowntime) return;
+                        showModal( 'Finalizar Orden', '¿Estás seguro? Esta acción no se puede deshacer.', () => {
+                            const finishedOrder = { ...state.selectedOrder, stopTime: Date.now() };
+                            state.allOrders[state.selectedMachine].finished.push(finishedOrder);
+                            state.allOrders[state.selectedMachine].active = state.allOrders[state.selectedMachine].active.filter(o => o.id !== finishedOrder.id);
+                            state.selectedOrder = null;
+                            state.screen = 'order_selection';
+                            saveState();
+                            renderApp();
+                        });
+                        break;
+                }
+            });
+            
+            // --- INITIALIZATION ---
+            loadState();
+            renderApp();
+        });
+    </script>
+</body>
+</html>
