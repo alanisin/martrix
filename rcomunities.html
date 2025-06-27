@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>R-Comunities - by seven reasoons</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter (as a fallback) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Custom styles for Apple-like design */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+            background-color: #f5f5f7;
+            color: #1d1d1f;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        .app-image {
+            border-radius: 22.5%;
+        }
+        .gradient-border-wrapper {
+             transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94), box-shadow 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+             box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.16);
+        }
+        .gradient-border-wrapper:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 7px 14px rgba(0,0,0,0.08), 0 3px 6px rgba(0,0,0,0.12);
+        }
+        .favorite-btn .star-outline { display: block; }
+        .favorite-btn .star-solid { display: none; }
+        .favorite-btn.favorited .star-outline { display: none; }
+        .favorite-btn.favorited .star-solid { display: block; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-16">
+        <!-- Header Section -->
+        <header class="text-center mb-12 md:mb-16">
+            <h1 class="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-gray-900">R-Comunities</h1>
+            <p class="mt-3 sm:mt-4 text-base sm:text-lg md:text-xl text-gray-600">by seven reasoons</p>
+        </header>
+
+        <!-- Controls Section: Search, Category, and Sort -->
+        <div class="mb-8 flex flex-col sm:flex-row flex-wrap items-center justify-center gap-4">
+            <div class="relative w-full sm:w-auto sm:flex-1 sm:max-w-xs">
+                <input type="text" id="search-input" placeholder="Buscar comunidades..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" /></svg>
+                </div>
+            </div>
+            <select id="category-select" class="w-full sm:w-auto sm:flex-1 sm:max-w-xs pl-4 pr-10 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none bg-white"></select>
+            <button id="sort-button" class="w-full sm:w-auto bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-5 rounded-full transition-colors duration-200">Ordenar A-Z</button>
+        </div>
+
+        <!-- Apps Grid Section -->
+        <main>
+            <!-- Updated grid classes for a more square-like layout -->
+            <div id="app-grid" class="grid grid-cols-1 gap-8 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"></div>
+        </main>
+
+        <!-- Footer Section -->
+        <footer class="text-center mt-16 md:mt-20 py-8 border-t border-gray-200">
+            <p class="text-gray-500">&copy; 2024 R-Comunities by seven reasoons. Todos los derechos reservados.</p>
+        </footer>
+    </div>
+
+    <!-- Main application script -->
+    <script>
+        // --- App Data ---
+        // Updated app data with descriptions.
+        const apps = [
+            { id: 'acuerdo-calidad', name: 'Acuerdo de Calidad', description: 'Comunidad para la gestión y seguimiento de acuerdos de calidad.', imageUrl: 'https://placehold.co/150x150/007AFF/ffffff?text=Acuerdo', url: 'https://www.sevenreasoons.com/acuerdo-calidad', category: 'Herramientas' },
+            { id: 'dpmt-calculator', name: 'DPMT Calculator', description: 'Calculadora para defectos por millón de transacciones.', imageUrl: 'https://placehold.co/150x150/34C759/ffffff?text=DPMT', url: 'https://www.sevenreasoons.com/dpmt-calculator', category: 'Calculadoras' },
+            { id: 'ie-matrix', name: 'I/E Matrix', description: 'Herramienta para análisis de matrices de Influencia/Esfuerzo.', imageUrl: 'https://placehold.co/150x150/FF9500/ffffff?text=Matrix', url: 'https://www.sevenreasoons.com/ie-matrix', category: 'Análisis' },
+            { id: 'rcomunities-home', name: 'R-Comunities Home', description: 'El punto de partida para todas nuestras comunidades.', imageUrl: 'https://placehold.co/150x150/FF3B30/ffffff?text=Home', url: 'https://www.sevenreasoons.com/', category: 'General' },
+            { id: 'pbi-conectores', name: 'PBI Conectores', description: 'Discute y comparte conectores de Power BI.', imageUrl: 'https://placehold.co/150x150/FFCC00/ffffff?text=PBI', url: 'https://www.sevenreasoons.com/pbi-conectores', category: 'Datos' },
+        ];
+
+        // --- DOM Elements ---
+        const appGrid = document.getElementById('app-grid');
+        const searchInput = document.getElementById('search-input');
+        const sortButton = document.getElementById('sort-button');
+        const categorySelect = document.getElementById('category-select');
+
+        // --- State ---
+        let currentSearchTerm = '';
+        let currentCategory = 'all';
+        let isSorted = false;
+        let favoriteIds = [];
+
+        // --- LocalStorage Functions ---
+        // Using a new key for favorites to avoid conflicts with the old version.
+        const getFavorites = () => JSON.parse(localStorage.getItem('rcomunities_favorites')) || [];
+        const saveFavorites = (ids) => localStorage.setItem('rcomunities_favorites', JSON.stringify(ids));
+
+        /**
+         * Populates the category selector dropdown.
+         */
+        function populateCategories() {
+            const categories = ['all', ...new Set(apps.map(app => app.category))];
+            categorySelect.innerHTML = '';
+            categories.forEach(category => {
+                const option = document.createElement('option');
+                option.value = category;
+                option.textContent = category === 'all' ? 'Todas las categorías' : category;
+                categorySelect.appendChild(option);
+            });
+        }
+        
+        /**
+         * Renders a given list of apps to the grid.
+         */
+        function renderApps(appsToRender) {
+            appGrid.innerHTML = '';
+            if (appsToRender.length === 0) {
+                appGrid.innerHTML = `<p class="col-span-full text-center text-gray-500">No se encontraron comunidades.</p>`;
+                return;
+            }
+
+            appsToRender.forEach(app => {
+                const isFavorite = favoriteIds.includes(app.id);
+                // The main container for the card content.
+                const appCardHTML = `
+                    <div class="gradient-border-wrapper rounded-xl sm:rounded-2xl bg-gradient-to-br from-yellow-300 via-orange-400 to-green-400 p-[2px]">
+                        <div class="bg-white h-full w-full rounded-[10px] sm:rounded-[14px] p-4 sm:p-5 flex flex-col items-center text-center relative">
+                            <button class="favorite-btn absolute top-2 right-2 p-1 rounded-full bg-white/50 hover:bg-white/80 transition ${isFavorite ? 'favorited' : ''}" data-id="${app.id}">
+                                <svg class="star-outline w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.196-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.783-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path></svg>
+                                <svg class="star-solid w-6 h-6 text-yellow-400" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path></svg>
+                            </button>
+                            <img src="${app.imageUrl}" alt="Logo de ${app.name}" class="app-image w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 mb-4 object-cover">
+                            <h3 class="font-semibold text-base sm:text-lg text-gray-900 mb-1 truncate w-full">${app.name}</h3>
+                            <p class="text-gray-500 text-xs sm:text-sm mb-2">${app.category}</p>
+                            <!-- Description is now left-aligned for better readability -->
+                            <p class="text-gray-600 text-sm px-2 mb-4 flex-grow text-left w-full">${app.description}</p>
+                            <a href="${app.url}" target="_blank" rel="noopener noreferrer" class="w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-5 sm:px-6 rounded-full text-sm sm:text-base transition-colors duration-200 mt-auto">Ir</a>
+                        </div>
+                    </div>
+                `;
+                appGrid.innerHTML += appCardHTML;
+            });
+        }
+        
+        /**
+         * Toggles the favorite status of an app.
+         */
+        function toggleFavorite(id) {
+            const index = favoriteIds.indexOf(id);
+            if (index > -1) {
+                favoriteIds.splice(index, 1); // Remove from favorites
+            } else {
+                favoriteIds.push(id); // Add to favorites
+            }
+            saveFavorites(favoriteIds);
+            updateAndRender();
+        }
+
+        /**
+         * Filters and sorts apps, then renders them.
+         */
+        function updateAndRender() {
+            let processedApps = [...apps];
+
+            // Filter by Category
+            if (currentCategory !== 'all') {
+                processedApps = processedApps.filter(app => app.category === currentCategory);
+            }
+            // Filter by Search Term (now searches in name and description)
+            if (currentSearchTerm) {
+                const lowerCaseTerm = currentSearchTerm.toLowerCase();
+                processedApps = processedApps.filter(app => 
+                    app.name.toLowerCase().includes(lowerCaseTerm) || 
+                    app.description.toLowerCase().includes(lowerCaseTerm)
+                );
+            }
+
+            // Sort
+            processedApps.sort((a, b) => {
+                const aIsFav = favoriteIds.includes(a.id);
+                const bIsFav = favoriteIds.includes(b.id);
+                // Favorites always come first
+                if (aIsFav && !bIsFav) return -1;
+                if (!aIsFav && bIsFav) return 1;
+                // If alphabetical sort is on, apply it
+                if (isSorted) return a.name.localeCompare(b.name);
+                return 0; // Maintain original order otherwise
+            });
+
+            renderApps(processedApps);
+        }
+
+        // --- Event Listeners ---
+        searchInput.addEventListener('input', e => {
+            currentSearchTerm = e.target.value;
+            updateAndRender();
+        });
+
+        categorySelect.addEventListener('change', e => {
+            currentCategory = e.target.value;
+            updateAndRender();
+        });
+
+        sortButton.addEventListener('click', () => {
+            isSorted = !isSorted;
+            sortButton.textContent = isSorted ? 'Orden Original' : 'Ordenar A-Z';
+            sortButton.classList.toggle('bg-blue-100', isSorted);
+            sortButton.classList.toggle('bg-gray-200', !isSorted);
+            updateAndRender();
+        });
+
+        appGrid.addEventListener('click', e => {
+            const favButton = e.target.closest('.favorite-btn');
+            if (favButton) {
+                const id = favButton.dataset.id;
+                toggleFavorite(id);
+            }
+        });
+
+        // --- Initial Load ---
+        document.addEventListener('DOMContentLoaded', () => {
+            favoriteIds = getFavorites();
+            populateCategories();
+            updateAndRender();
+        });
+    </script>
+</body>
+</html>
