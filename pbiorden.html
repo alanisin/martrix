@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Juego de Ordenamiento: Fases de Power BI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Poppins:wght@700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Montserrat', sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+        .font-title { font-family: 'Poppins', sans-serif; }
+        .card { cursor: grab; transition: all 0.2s ease-in-out; touch-action: none; position: relative; }
+        .card:active { cursor: grabbing; transform: scale(1.05); }
+        .dragging { opacity: 0.5; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
+        .feedback-correct .card-inner { background-color: #f0fdf4; border-left: 4px solid #22c55e; }
+        .feedback-incorrect .card-inner { background-color: #fef2f2; border-left: 4px solid #ef4444; }
+        
+        .gradient-border-container {
+            padding: 2px;
+            background: linear-gradient(90deg, #facc15, #4ade80);
+            border-radius: 1.25rem; /* 20px */
+        }
+
+        .drop-zone { 
+            transition: background-color 0.2s, border-color 0.2s; 
+            border: 2px dashed #e5e5e5; /* neutral-200 */
+            min-height: 80px;
+            border-radius: 1rem;
+        }
+        .drop-zone.drag-over { background-color: #f5f5f5; /* neutral-100 */ border-color: #a3a3a3; }
+        .drop-zone.is-filled { border-style: solid; border-color: transparent; padding: 0; }
+
+        .card .details-tooltip { visibility: hidden; opacity: 0; position: absolute; bottom: 105%; left: 50%; transform: translateX(-50%); width: 280px; background-color: #262626; color: #fff; text-align: center; padding: 10px; border-radius: 6px; z-index: 50; transition: opacity 0.3s; pointer-events: none; font-size: 0.875rem; line-height: 1.25rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .card .details-tooltip::after { content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px; border-width: 5px; border-style: solid; border-color: #262626 transparent transparent transparent; }
+        .card:hover .details-tooltip { visibility: visible; opacity: 1; }
+        
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255, 255, 255, 0.5); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+        .modal-content { background: white; padding: 2rem; border-radius: 1rem; max-width: 90%; width: 600px; max-height: 90vh; overflow-y: auto; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15); border: 1px solid #f5f5f5;}
+    </style>
+</head>
+<body class="bg-neutral-50 text-neutral-800">
+
+    <!-- Welcome Screen -->
+    <div id="welcome-container" class="container mx-auto p-4 md:p-8 max-w-lg text-center h-screen flex flex-col items-center justify-center">
+        <div class="w-full gradient-border-container">
+            <div class="bg-white p-10 rounded-2xl">
+                 <h1 class="text-3xl md:text-4xl font-bold text-neutral-900 font-title">Bienvenido al Desafío Power BI</h1>
+                 <p class="mt-4 text-lg text-neutral-600">Ingresa tu nombre completo para comenzar.</p>
+                 <input type="text" id="player-name-input" placeholder="Escribe tu nombre completo..." class="mt-8 w-full p-3 text-center border border-neutral-200 rounded-lg bg-neutral-100/50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-neutral-400">
+                 <div class="mt-6 flex flex-col sm:flex-row gap-4">
+                     <button id="start-game-btn" class="w-full bg-gradient-to-r from-yellow-400 to-green-400 text-neutral-900 font-bold py-3 px-6 rounded-lg shadow-sm transition-all transform hover:scale-105 disabled:bg-neutral-200 disabled:text-neutral-500 disabled:from-neutral-200 disabled:to-neutral-200 disabled:cursor-not-allowed" disabled>Comenzar a Jugar</button>
+                     <button id="history-btn" class="w-full bg-neutral-200 hover:bg-neutral-300 text-neutral-800 font-bold py-3 px-6 rounded-lg transition-colors disabled:bg-neutral-100 disabled:text-neutral-400 disabled:cursor-not-allowed" disabled>Historial</button>
+                 </div>
+            </div>
+        </div>
+        <footer class="absolute bottom-6 text-center text-sm text-neutral-500">
+            <p>Diseñado por <a href="http://www.sevenreasoons.com" target="_blank" class="font-semibold hover:underline">SevenReasoons</a></p>
+        </footer>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="game-container" class="container mx-auto p-4 md:p-8 max-w-7xl hidden">
+        <header class="text-center mb-8">
+            <div class="flex justify-between items-center">
+                <div class="text-left w-1/3">
+                    <p class="text-base text-neutral-600">Jugador: <span id="player-name-display" class="font-semibold text-neutral-800"></span></p>
+                </div>
+                <h1 class="text-2xl md:text-3xl font-bold text-neutral-900 font-title text-center w-1/3">Ordena las Fases</h1>
+                <div class="text-right w-1/3">
+                     <p class="text-base text-neutral-600">Tiempo: <span id="timer-display" class="font-semibold text-neutral-800">00:00</span></p>
+                </div>
+            </div>
+        </header>
+
+        <main>
+            <div class="gradient-border-container">
+                 <div id="drop-zones-container" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-11 gap-3 p-4 bg-white rounded-2xl"></div>
+            </div>
+            
+            <div class="mt-8 gradient-border-container">
+                 <div class="p-6 bg-white rounded-2xl">
+                     <h3 class="font-bold text-center mb-4 text-neutral-700">Tarjetas Disponibles</h3>
+                     <div id="card-pool-container" class="card-pool grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 bg-neutral-100/50 rounded-xl p-4"></div>
+                 </div>
+            </div>
+            
+            <div class="mt-8 flex flex-wrap justify-center items-center gap-4">
+                <button id="check-order-btn" class="w-full sm:w-auto bg-gradient-to-r from-yellow-400 to-green-400 text-neutral-900 font-bold py-3 px-6 rounded-lg shadow-sm transition-all transform hover:scale-105">Verificar Orden</button>
+                <button id="reset-btn" class="w-full sm:w-auto bg-neutral-200 hover:bg-neutral-300 text-neutral-800 font-bold py-3 px-6 rounded-lg transition-colors">Reiniciar</button>
+                <button id="change-player-btn" class="w-full sm:w-auto bg-neutral-200 hover:bg-neutral-300 text-neutral-800 font-bold py-3 px-6 rounded-lg transition-colors">Cambiar Jugador</button>
+                <button id="download-pdf-btn" class="w-full sm:w-auto bg-gradient-to-r from-yellow-400 to-green-400 text-neutral-900 font-bold py-3 px-6 rounded-lg shadow-sm transition-all transform hover:scale-105 hidden">Descargar Certificado</button>
+            </div>
+            <div id="feedback-message" class="mt-6 text-center text-xl font-semibold p-4 rounded-lg hidden"></div>
+        </main>
+        <footer class="text-center mt-8 text-sm text-neutral-500">
+            <p>Diseñado por <a href="http://www.sevenreasoons.com" target="_blank" class="font-semibold hover:underline">SevenReasoons</a></p>
+        </footer>
+    </div>
+
+    <!-- History Modal -->
+    <div id="history-modal" class="modal-overlay hidden"><div class="modal-content"><div class="flex justify-between items-center mb-4"><h2 class="text-2xl font-bold text-neutral-900 font-title">Historial de <span id="history-player-name"></span></h2><button id="close-history-btn" class="text-neutral-500 hover:text-neutral-800 text-2xl">&times;</button></div><div id="history-chart-container" style="height: 300px;"><canvas id="history-chart"></canvas></div><p id="no-history-message" class="text-center text-neutral-500 hidden">Aún no tienes intentos registrados.</p></div></div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // --- DOM Elements ---
+        const welcomeContainer = document.getElementById('welcome-container');
+        const gameContainer = document.getElementById('game-container');
+        const playerNameInput = document.getElementById('player-name-input');
+        const startGameBtn = document.getElementById('start-game-btn');
+        const playerNameDisplay = document.getElementById('player-name-display');
+        const historyBtn = document.getElementById('history-btn');
+        const dropZonesContainer = document.getElementById('drop-zones-container');
+        const cardPoolContainer = document.getElementById('card-pool-container');
+        const checkOrderBtn = document.getElementById('check-order-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const changePlayerBtn = document.getElementById('change-player-btn');
+        const downloadPdfBtn = document.getElementById('download-pdf-btn');
+        const feedbackMessage = document.getElementById('feedback-message');
+        const timerDisplay = document.getElementById('timer-display');
+        const historyModal = document.getElementById('history-modal');
+        const closeHistoryBtn = document.getElementById('close-history-btn');
+        const historyPlayerName = document.getElementById('history-player-name');
+        const historyChartCanvas = document.getElementById('history-chart');
+        const noHistoryMessage = document.getElementById('no-history-message');
+
+        // --- Game State ---
+        let draggedItem = null; let playerName = ''; let historyChart = null;
+        let timerInterval = null; let startTime = 0; let elapsedTime = 0;
+        
+        // --- Data ---
+        const cardData = [
+            { order: 1, title: 'Definición de objetivos del negocio', text: 'Entender qué problema resolver, identificar KPIs y preguntas clave con stakeholders.' },
+            { order: 2, title: 'Identificación y análisis de fuentes de datos', text: 'Mapear sistemas (ERP, CRM, etc.), evaluar calidad y disponibilidad de datos.' },
+            { order: 3, title: 'Diseño de la arquitectura de datos', text: 'Estructurar el modelo de datos: tablas, relaciones, claves. Prevenir modelos lentos.' },
+            { order: 4, title: 'Extracción, transformación y carga (ETL)', text: 'Conectar a fuentes, limpiar y transformar data con Power Query.' },
+            { order: 5, title: 'Modelado de datos', text: 'Crear relaciones, jerarquías, y medidas DAX. Optimizar el modelo.' },
+            { order: 6, title: 'Diseño visual y experiencia de usuario (UI/UX)', text: 'Definir layout, colores, filtros y navegación. Priorizar claridad y estética.' },
+            { order: 7, title: 'Implementación de seguridad y gobernanza', text: 'Aplicar Row-Level Security (RLS), definir roles y documentar reglas.' },
+            { order: 8, title: 'Pruebas y validación funcional', text: 'Revisar con usuarios clave que los datos y filtros sean correctos. Probar rendimiento.' },
+            { order: 9, title: 'Publicación y despliegue', text: 'Publicar en workspace, programar actualizaciones y configurar permisos.' },
+            { order: 10, title: 'Capacitación y documentación', text: 'Crear guías y tutoriales para usuarios finales. Recibir retroalimentación.' },
+            { order: 11, title: 'Monitoreo y mejora continua', text: 'Monitorear el uso del dashboard y ajustarlo según nuevas necesidades.' }
+        ];
+
+        // --- Event Listeners ---
+        playerNameInput.addEventListener('input', () => {
+            const hasName = playerNameInput.value.trim() !== '';
+            startGameBtn.disabled = !hasName;
+            historyBtn.disabled = !hasName;
+        });
+        startGameBtn.addEventListener('click', () => {
+            playerName = playerNameInput.value.trim();
+            playerNameDisplay.textContent = playerName;
+            welcomeContainer.classList.add('hidden');
+            gameContainer.classList.remove('hidden');
+            initializeGame();
+        });
+        changePlayerBtn.addEventListener('click', () => {
+            gameContainer.classList.add('hidden');
+            welcomeContainer.classList.remove('hidden');
+            stopTimer();
+            playerNameInput.focus();
+        });
+        historyBtn.addEventListener('click', () => {
+            playerName = playerNameInput.value.trim();
+            historyPlayerName.textContent = playerName;
+            showHistory();
+            historyModal.classList.remove('hidden');
+        });
+        checkOrderBtn.addEventListener('click', checkOrder);
+        resetBtn.addEventListener('click', initializeGame);
+        closeHistoryBtn.addEventListener('click', () => historyModal.classList.add('hidden'));
+        downloadPdfBtn.addEventListener('click', generatePDF);
+
+
+        // --- Timer Functions ---
+        function startTimer() {
+            stopTimer();
+            startTime = Date.now();
+            timerInterval = setInterval(() => {
+                elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+                timerDisplay.textContent = formatTime(elapsedTime);
+            }, 1000);
+        }
+        function stopTimer() { clearInterval(timerInterval); }
+        function formatTime(seconds) {
+            const min = Math.floor(seconds / 60).toString().padStart(2, '0');
+            const sec = (seconds % 60).toString().padStart(2, '0');
+            return `${min}:${sec}`;
+        }
+        
+        // --- Game Initialization ---
+        function initializeGame() {
+            dropZonesContainer.innerHTML = '';
+            cardPoolContainer.innerHTML = '';
+            for (let i = 1; i <= cardData.length; i++) {
+                const zone = document.createElement('div');
+                zone.className = 'drop-zone flex items-center justify-center';
+                zone.dataset.zoneId = i;
+                zone.innerHTML = `<span class="text-2xl font-bold text-neutral-400">${i}</span>`;
+                addDropZoneListeners(zone);
+                dropZonesContainer.appendChild(zone);
+            }
+            const shuffledCards = [...cardData].sort(() => Math.random() - 0.5);
+            shuffledCards.forEach(item => {
+                const cardElement = createCardElement(item);
+                cardPoolContainer.appendChild(cardElement);
+            });
+            addDropZoneListeners(cardPoolContainer);
+            hideFeedback();
+            checkOrderBtn.disabled = false;
+            downloadPdfBtn.classList.add('hidden');
+            startTimer();
+        }
+        
+        function createCardElement(item) {
+            const cardElement = document.createElement('div');
+            cardElement.id = 'card-' + item.order;
+            cardElement.className = 'card';
+            cardElement.dataset.order = item.order;
+            cardElement.setAttribute('draggable', true);
+            cardElement.innerHTML = `<div class="card-inner bg-white p-3 rounded-lg shadow-sm flex items-center space-x-3 h-full border border-neutral-200"><span class="flex-shrink-0 h-8 w-8 rounded-full bg-neutral-100 text-neutral-600 flex items-center justify-center font-bold text-base">📌</span><h3 class="font-semibold text-xs text-neutral-800">${item.title}</h3><div class="details-tooltip">${item.text}</div></div>`;
+            addCardListeners(cardElement);
+            return cardElement;
+        }
+
+        // --- Drag and Drop Logic ---
+        function addCardListeners(card) {
+            card.addEventListener('dragstart', e => { draggedItem = card; setTimeout(() => card.classList.add('dragging'), 0); });
+            card.addEventListener('dragend', () => { if(draggedItem) { draggedItem.classList.remove('dragging'); } draggedItem = null; });
+        }
+        function addDropZoneListeners(zone) {
+            zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+            zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+            zone.addEventListener('drop', e => {
+                e.preventDefault();
+                zone.classList.remove('drag-over');
+                if (!draggedItem) return;
+                const existingCard = zone.querySelector('.card');
+                if (existingCard) { const sourceContainer = draggedItem.parentElement; sourceContainer.appendChild(existingCard); }
+                const zoneNumber = zone.querySelector('span');
+                if(zoneNumber) zoneNumber.style.display = 'none';
+                zone.appendChild(draggedItem);
+                zone.classList.add('is-filled');
+            });
+        }
+
+        // --- Main Actions ---
+        function checkOrder() {
+            stopTimer();
+            hideFeedback();
+            let correctCount = 0;
+            const zones = dropZonesContainer.querySelectorAll('.drop-zone');
+            zones.forEach((zone, index) => {
+                const card = zone.querySelector('.card');
+                if (card) {
+                    const cardOrder = parseInt(card.dataset.order);
+                    const correctOrder = index + 1;
+                    if (cardOrder === correctOrder) { card.classList.add('feedback-correct'); correctCount++; } 
+                    else { card.classList.add('feedback-incorrect'); }
+                }
+            });
+            saveGameResult(playerName, correctCount, cardData.length, elapsedTime);
+            if (correctCount === cardData.length) {
+                showFeedback(`¡Felicidades! 🎉 Has ordenado las ${correctCount} fases en ${formatTime(elapsedTime)}.`, 'success');
+                downloadPdfBtn.classList.remove('hidden');
+            } else {
+                showFeedback(`¡Casi! Tienes ${correctCount} de ${cardData.length} fases correctas.`, 'error');
+            }
+            checkOrderBtn.disabled = true;
+        }
+
+        // --- History & Storage ---
+        const STORAGE_KEY = 'powerbiGameHistory';
+        function getHistory() { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
+        function saveGameResult(name, score, total, time) {
+            const history = getHistory();
+            history.push({ name, score, total, time, date: new Date().toISOString() });
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+        }
+        function showHistory() {
+            const playerHistory = getHistory().filter(item => item.name === playerName);
+            if(playerHistory.length === 0){
+                noHistoryMessage.classList.remove('hidden');
+                historyChartCanvas.style.display = 'none';
+                if (historyChart) historyChart.destroy();
+                return;
+            }
+            noHistoryMessage.classList.add('hidden');
+            historyChartCanvas.style.display = 'block';
+            const labels = playerHistory.map((_, index) => `Intento ${index + 1}`);
+            const scores = playerHistory.map(item => item.score);
+            const times = playerHistory.map(item => item.time);
+            if(historyChart) historyChart.destroy();
+            historyChart = new Chart(historyChartCanvas.getContext('2d'), {
+                type: 'bar',
+                data: { 
+                    labels, 
+                    datasets: [
+                        { label: 'Aciertos', data: scores, backgroundColor: 'rgba(59, 130, 246, 0.6)', borderColor: 'rgba(37, 99, 235, 1)', yAxisID: 'y', order: 2 },
+                        { label: 'Tiempo (seg)', data: times, type: 'line', borderColor: 'rgba(234, 179, 8, 1)', backgroundColor: 'rgba(234, 179, 8, 0.2)', yAxisID: 'y1', order: 1, tension: 0.3 }
+                    ]
+                },
+                options: {
+                    animation: false,
+                    scales: { 
+                        y: { beginAtZero: true, max: cardData.length, position: 'left', title: { display: true, text: 'Aciertos' } },
+                        y1: { beginAtZero: true, position: 'right', title: { display: true, text: 'Tiempo (segundos)' }, grid: { drawOnChartArea: false } }
+                    }, 
+                    responsive: true, maintainAspectRatio: false 
+                }
+            });
+        }
+        
+        async function generatePDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('p', 'mm', 'a4');
+            
+            historyModal.classList.remove('hidden');
+            showHistory();
+            await new Promise(resolve => setTimeout(resolve, 500)); 
+            
+            const pageW = doc.internal.pageSize.getWidth();
+            const pageH = doc.internal.pageSize.getHeight();
+            doc.setDrawColor(229, 231, 235);
+            doc.setLineWidth(2);
+            doc.rect(5, 5, pageW - 10, pageH - 10);
+            
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(17, 24, 39);
+            doc.setFontSize(30);
+            doc.text("Reconocimiento", pageW / 2, 30, { align: "center" });
+
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(75, 85, 99);
+            doc.setFontSize(14);
+            doc.text("Otorgado a:", pageW / 2, 45, { align: "center" });
+
+            doc.setFont("times", "bolditalic");
+            doc.setTextColor(0, 0, 0);
+            doc.setFontSize(28);
+            doc.text(playerName, pageW / 2, 60, { align: "center" });
+
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(12);
+            const totalAttempts = getHistory().filter(item => item.name === playerName).length;
+            const achievementText = `Por completar exitosamente el desafío de ordenamiento de fases de Power BI el ${new Date().toLocaleDateString('es-ES')}.`;
+            doc.text(achievementText, pageW / 2, 75, { align: "center", maxWidth: 160 });
+            doc.text(`Logro alcanzado en ${totalAttempts} intento(s) con un tiempo final de ${formatTime(elapsedTime)}.`, pageW / 2, 85, { align: "center", maxWidth: 160 });
+            
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(17, 24, 39);
+            doc.setFontSize(16);
+            doc.text("Progreso de Intentos", 20, 105);
+            try {
+                const canvas = await html2canvas(historyChartCanvas, { backgroundColor: '#ffffff' });
+                const imgData = canvas.toDataURL('image/png');
+                doc.addImage(imgData, 'PNG', 20, 115, 170, 85);
+            } catch (error) { 
+                console.error("Error generating chart image:", error);
+                doc.text("Error al generar la gráfica.", 20, 115); 
+            }
+            
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(17, 24, 39);
+            doc.setFontSize(16);
+            doc.text("Fases en Orden Correcto", 20, 215);
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(0, 0, 0);
+            doc.setFontSize(9);
+            const sortedCards = [...cardData].sort((a,b) => a.order - b.order);
+            let yPos = 225;
+            sortedCards.forEach(card => {
+                doc.text(`${card.order}. ${card.title}`, 22, yPos, { maxWidth: 165 });
+                yPos += 5;
+            });
+
+            doc.setLineWidth(0.5);
+            doc.setDrawColor(229, 231, 235);
+            doc.line(20, 270, pageW - 20, 270);
+            doc.setFont("helvetica", "italic");
+            doc.setTextColor(107, 114, 128);
+            doc.setFontSize(10);
+            doc.text("Certificado y verificado por SevenReasoons.", pageW / 2, 278, { align: "center" });
+            doc.setTextColor(107, 114, 128);
+            doc.setFontSize(8);
+            doc.text("www.sevenreasoons.com", pageW / 2, 283, { align: "center" });
+            
+            historyModal.classList.add('hidden');
+            doc.save(`Certificado-PowerBI-${playerName}.pdf`);
+        }
+
+        // --- UI Helpers ---
+        function showFeedback(message, type) {
+            feedbackMessage.textContent = message;
+            feedbackMessage.className = 'mt-6 text-center text-xl font-semibold p-4 rounded-lg';
+            if (type === 'success') { feedbackMessage.classList.add('bg-green-100', 'text-green-800'); }
+            else if (type === 'error') { feedbackMessage.classList.add('bg-red-100', 'text-red-800'); }
+        }
+        function hideFeedback() {
+             feedbackMessage.classList.add('hidden');
+             dropZonesContainer.querySelectorAll('.card').forEach(c => {
+                 c.classList.remove('feedback-correct', 'feedback-incorrect');
+                 const cardInner = c.querySelector('.card-inner');
+                 if(cardInner) {
+                    cardInner.style.backgroundColor = '';
+                 }
+             });
+        }
+    });
+    </script>
+</body>
+</html>
