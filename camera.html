@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cámara y Galería de Fotos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Estilo para un efecto de flash sutil */
+        .flash-effect {
+            animation: flash 0.5s ease-out;
+        }
+        @keyframes flash {
+            from { box-shadow: 0 0 0 10px rgba(255, 255, 255, 0.7) inset; }
+            to { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+        }
+        /* Estilo para las imágenes de la galería */
+        .gallery-item img {
+            aspect-ratio: 1 / 1;
+            object-fit: cover;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 font-sans antialiased">
+
+    <div id="app" class="container mx-auto max-w-2xl p-4">
+        <header class="text-center my-6">
+            <h1 class="text-4xl font-bold tracking-tight text-gray-900 dark:text-white">Insta-Foto</h1>
+            <p class="mt-2 text-lg text-gray-600 dark:text-gray-400">Toma una foto y guárdala en tu galería personal.</p>
+        </header>
+
+        <!-- Sección de la Cámara -->
+        <main id="camera-section" class="mb-8">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
+                <!-- Mensaje de Carga / Error -->
+                <div id="loading-message" class="p-8 text-center">
+                    <i class="fas fa-spinner fa-spin text-4xl text-sky-500"></i>
+                    <p class="mt-4">Iniciando cámara...</p>
+                </div>
+                
+                <!-- Vista de la Cámara -->
+                <div class="relative">
+                    <video id="camera-feed" class="w-full h-auto hidden" autoplay playsinline></video>
+                    <canvas id="photo-canvas" class="hidden"></canvas>
+                </div>
+
+                <!-- Botón de Captura -->
+                <div id="controls" class="p-4 bg-gray-50 dark:bg-gray-700 text-center hidden">
+                    <button id="take-photo-btn" class="w-20 h-20 bg-white dark:bg-gray-200 rounded-full border-4 border-sky-500 hover:bg-sky-100 dark:hover:bg-gray-300 focus:outline-none focus:ring-4 focus:ring-sky-300 dark:focus:ring-sky-600 transition duration-300 ease-in-out transform hover:scale-110">
+                        <i class="fas fa-camera text-3xl text-sky-600"></i>
+                    </button>
+                </div>
+            </div>
+        </main>
+        
+        <!-- Sección de la Galería -->
+        <section id="gallery-section">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-semibold">Tu Galería</h2>
+                <button id="clear-gallery-btn" class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-400 text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                    <i class="fas fa-trash-alt mr-2"></i>Vaciar Galería
+                </button>
+            </div>
+            
+            <div id="gallery-grid" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+                <!-- Las fotos se añadirán aquí -->
+            </div>
+            <p id="empty-gallery-message" class="text-center text-gray-500 mt-8">Tu galería está vacía. ¡Toma tu primera foto!</p>
+        </section>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Referencias a los elementos del DOM
+            const app = document.getElementById('app');
+            const video = document.getElementById('camera-feed');
+            const canvas = document.getElementById('photo-canvas');
+            const takePhotoButton = document.getElementById('take-photo-btn');
+            const clearGalleryButton = document.getElementById('clear-gallery-btn');
+            const galleryGrid = document.getElementById('gallery-grid');
+            const emptyGalleryMessage = document.getElementById('empty-gallery-message');
+            const loadingMessage = document.getElementById('loading-message');
+            const controls = document.getElementById('controls');
+
+            const STORAGE_KEY = 'miGaleriaDeFotos';
+            let photos = [];
+
+            /**
+             * Inicializa la aplicación: inicia la cámara y carga las fotos guardadas.
+             */
+            async function init() {
+                loadPhotosFromStorage();
+                try {
+                    // Solicitar acceso a la cámara
+                    const stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { facingMode: 'environment' } // Prioriza la cámara trasera
+                    });
+                    
+                    // Ocultar mensaje de carga y mostrar la cámara
+                    loadingMessage.classList.add('hidden');
+                    video.classList.remove('hidden');
+                    controls.classList.remove('hidden');
+
+                    // Asignar el stream de video al elemento <video>
+                    video.srcObject = stream;
+                } catch (error) {
+                    console.error("Error al acceder a la cámara:", error);
+                    // Mostrar mensaje de error si el usuario niega el permiso o hay un problema
+                    loadingMessage.innerHTML = `
+                        <i class="fas fa-exclamation-triangle text-4xl text-red-500"></i>
+                        <p class="mt-4">No se pudo acceder a la cámara.</p>
+                        <p class="text-sm text-gray-500 mt-2">Asegúrate de haber dado permiso para usar la cámara en la configuración de tu navegador.</p>
+                    `;
+                }
+            }
+
+            /**
+             * Carga las fotos desde localStorage.
+             */
+            function loadPhotosFromStorage() {
+                const storedPhotos = localStorage.getItem(STORAGE_KEY);
+                if (storedPhotos) {
+                    photos = JSON.parse(storedPhotos);
+                }
+                renderGallery();
+            }
+            
+            /**
+             * Guarda el array de fotos actual en localStorage.
+             */
+            function savePhotosToStorage() {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(photos));
+            }
+
+            /**
+             * Renderiza todas las fotos en la galería.
+             */
+            function renderGallery() {
+                galleryGrid.innerHTML = ''; // Limpiar la galería actual
+                if (photos.length === 0) {
+                    emptyGalleryMessage.classList.remove('hidden');
+                    clearGalleryButton.disabled = true;
+                } else {
+                    emptyGalleryMessage.classList.add('hidden');
+                    clearGalleryButton.disabled = false;
+                    photos.forEach((photoDataUrl, index) => {
+                        const imgContainer = document.createElement('div');
+                        imgContainer.className = 'gallery-item relative group cursor-pointer overflow-hidden rounded-lg';
+                        
+                        const img = document.createElement('img');
+                        img.src = photoDataUrl;
+                        img.alt = `Foto de la galería ${index + 1}`;
+                        img.className = 'transition-transform duration-300 group-hover:scale-110';
+
+                        // Botón para borrar foto individual
+                        const deleteButton = document.createElement('button');
+                        deleteButton.innerHTML = '<i class="fas fa-times text-white text-lg"></i>';
+                        deleteButton.className = 'absolute top-1 right-1 w-6 h-6 bg-black bg-opacity-50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity';
+                        deleteButton.onclick = (e) => {
+                            e.stopPropagation(); // Evitar que se dispare otro evento
+                            deletePhoto(index);
+                        };
+
+                        imgContainer.appendChild(img);
+                        imgContainer.appendChild(deleteButton);
+                        galleryGrid.prepend(imgContainer); // Usar prepend para que la más nueva aparezca primero
+                    });
+                }
+            }
+
+            /**
+             * Captura una foto desde el stream de video.
+             */
+            function takePhoto() {
+                // Aplicar efecto visual de flash
+                app.classList.add('flash-effect');
+                setTimeout(() => app.classList.remove('flash-effect'), 500);
+
+                // Ajustar el tamaño del canvas a las dimensiones del video
+                const { videoWidth, videoHeight } = video;
+                canvas.width = videoWidth;
+                canvas.height = videoHeight;
+                
+                // Dibujar el frame actual del video en el canvas
+                const context = canvas.getContext('2d');
+                context.drawImage(video, 0, 0, videoWidth, videoHeight);
+                
+                // Convertir la imagen del canvas a formato Base64
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.9); // 0.9 es la calidad de la imagen
+                
+                // Añadir la nueva foto y guardar
+                photos.push(dataUrl);
+                savePhotosToStorage();
+                
+                // Actualizar la galería para mostrar la nueva foto
+                renderGallery();
+            }
+            
+            /**
+             * Elimina una foto específica de la galería.
+             */
+            function deletePhoto(index) {
+                if (confirm('¿Estás seguro de que quieres eliminar esta foto?')) {
+                    photos.splice(index, 1);
+                    savePhotosToStorage();
+                    renderGallery();
+                }
+            }
+
+            /**
+             * Limpia toda la galería y el almacenamiento local.
+             */
+            function clearGallery() {
+                if (photos.length > 0 && confirm('¿Estás seguro de que quieres eliminar TODAS las fotos de tu galería? Esta acción no se puede deshacer.')) {
+                    photos = [];
+                    localStorage.removeItem(STORAGE_KEY);
+                    renderGallery();
+                }
+            }
+
+            // --- Event Listeners ---
+            takePhotoButton.addEventListener('click', takePhoto);
+            clearGalleryButton.addEventListener('click', clearGallery);
+
+            // Iniciar la aplicación
+            init();
+        });
+    </script>
+</body>
+</html>
