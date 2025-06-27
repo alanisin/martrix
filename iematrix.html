@@ -103,8 +103,6 @@
             // == MANEJO DE ESTADO ==
             const [projects, setProjects] = useState(() => {
                 // *** PERSISTENCIA: Carga inicial desde localStorage ***
-                // Al iniciar, intenta leer los proyectos guardados.
-                // Si no hay nada, usa los datos de ejemplo.
                 try {
                     const savedProjects = localStorage.getItem('impactEffortProjects');
                     return savedProjects ? JSON.parse(savedProjects) : [
@@ -115,7 +113,7 @@
                     ];
                 } catch (error) {
                     console.error("Error al cargar proyectos desde localStorage:", error);
-                    return []; // Devuelve un array vacío si hay un error
+                    return [];
                 }
             });
 
@@ -130,20 +128,16 @@
             const captureRef = useRef(null);
             
             // == EFECTOS SECUNDARIOS (SIDEEFFECTS) ==
-            // *** PERSISTENCIA: Guardado automático en localStorage ***
-            // Este efecto se ejecuta CADA VEZ que el array 'projects' cambia.
             useEffect(() => {
                 localStorage.setItem('impactEffortProjects', JSON.stringify(projects));
             }, [projects]);
             
-            // Escucha cambios en el tamaño de la ventana para hacer el gráfico responsivo
             useEffect(() => {
                 const handleResize = () => setWindowWidth(window.innerWidth);
                 window.addEventListener('resize', handleResize);
                 return () => window.removeEventListener('resize', handleResize);
             }, []);
 
-            // Proyectos ordenados (memorizado para eficiencia)
             const sortedProjects = useMemo(() => {
                 const projectsCopy = [...projects];
                 if (isSorted) {
@@ -156,7 +150,6 @@
                 p.name.toLowerCase().includes(filter.toLowerCase())
             ), [sortedProjects, filter]);
 
-            // Función para obtener opciones responsivas del gráfico
             const getChartOptions = useCallback(() => {
                 const isMobile = windowWidth < 768;
                 const titleFontSize = isMobile ? 12 : 14;
@@ -186,7 +179,6 @@
                 };
             }, [windowWidth]);
 
-            // Crea y gestiona la instancia de Chart.js
             useEffect(() => {
                 if (!chartRef.current) return;
                 if (chartInstanceRef.current) chartInstanceRef.current.destroy();
@@ -217,7 +209,6 @@
                 };
             }, [displayedProjects, getChartOptions]);
 
-            // == FUNCIONES AUXILIARES ==
             const getQuadrantName = (project) => {
                 if (project.impact >= 5 && project.effort < 5) return "Quick Wins";
                 if (project.impact >= 5 && project.effort >= 5) return "Proyectos Estratégicos";
@@ -226,7 +217,6 @@
                 return "Indefinido";
             };
 
-            // == MANEJADORES DE EVENTOS ==
             const handleAddProject = (e) => {
                 e.preventDefault();
                 if (!projectName.trim()) return;
@@ -340,8 +330,8 @@
                         </div>
                     </main>
                      <footer className="text-center mt-8 pb-8 px-4 text-sm text-slate-500">
-                        <p>Creado con React, Tailwind y Chart.js.</p>
                         <p>Arrastra los puntos en el gráfico para actualizarlos.</p>
+                        <p className="mt-4">Diseñado por <strong>sevenreasoons</strong>. Visita <a href="http://www.sevenreasoons.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">www.sevenreasoons.com</a> para más información.</p>
                     </footer>
                 </div>
             );
