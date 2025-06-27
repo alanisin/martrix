@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Matriz Impacto-Esfuerzo</title>
+    
+    <!-- Tailwind CSS para estilos rápidos y responsivos -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts: Inter para una tipografía limpia -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- React y Babel para que el código JSX funcione directamente en el navegador -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Chart.js y plugins para el gráfico interactivo -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-dragdata@2.2.5/dist/chartjs-plugin-dragdata.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+    
+    <!-- html2canvas para la funcionalidad de guardar como imagen -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <style>
+        /* Estilos personalizados para complementar Tailwind */
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        /* Previene el parpadeo de las etiquetas al arrastrar puntos */
+        .chartjs-datalabel-drag-active {
+            opacity: 0;
+        }
+        /* Mejora la experiencia de arrastre en dispositivos táctiles */
+        canvas {
+            touch-action: none;
+        }
+        /* Asegura que el fondo se capture en la imagen exportada */
+        #capture-area {
+            background-color: #f8fafc; /* Color de fondo (bg-slate-50) */
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo, useCallback } = React;
+
+        // == PLUGIN PERSONALIZADO DE CHART.JS PARA LOS CUADRANTES ==
+        const quadrantsPlugin = {
+            id: 'quadrants',
+            beforeDraw(chart, args, options) {
+                const { ctx, chartArea: { left, top, right, bottom }, scales: { x, y } } = chart;
+                const midX = x.getPixelForValue(5);
+                const midY = y.getPixelForValue(5);
+                ctx.save();
+                const colors = {
+                    quickWins: 'rgba(74, 222, 128, 0.1)',
+                    strategic: 'rgba(96, 165, 250, 0.1)',
+                    lowHanging: 'rgba(250, 204, 21, 0.1)',
+                    timeWasters: 'rgba(248, 113, 113, 0.1)',
+                };
+                
+                // Dibuja los fondos de los cuadrantes
+                ctx.fillStyle = colors.quickWins;
+                ctx.fillRect(left, top, midX - left, midY - top);
+                ctx.fillStyle = colors.strategic;
+                ctx.fillRect(midX, top, right - midX, midY - top);
+                ctx.fillStyle = colors.lowHanging;
+                ctx.fillRect(left, midY, midX - left, bottom - midY);
+                ctx.fillStyle = colors.timeWasters;
+                ctx.fillRect(midX, midY, right - midX, bottom - midY);
+                
+                // Dibuja las etiquetas de los cuadrantes con tamaño de fuente responsivo
+                const isMobile = chart.width < 500;
+                const fontSize = isMobile ? 12 : 14;
+                ctx.font = `600 ${fontSize}px Inter`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+
+                ctx.fillStyle = 'rgba(22, 163, 74, 0.8)';
+                ctx.fillText('Quick Wins', left + (midX - left) / 2, top + 20);
+                ctx.fillStyle = 'rgba(59, 130, 246, 0.8)';
+                ctx.fillText('Proyectos Estratégicos', midX + (right - midX) / 2, top + 20);
+                ctx.fillStyle = 'rgba(217, 119, 6, 0.8)';
+                ctx.fillText('Frutos Maduros', left + (midX - left) / 2, bottom - 20);
+                ctx.fillStyle = 'rgba(220, 38, 38, 0.8)';
+                ctx.fillText('Pérdidas de Tiempo', midX + (right - midX) / 2, bottom - 20);
+                ctx.restore();
+            }
+        };
+
+        // == COMPONENTE PRINCIPAL DE LA APLICACIÓN REACT ==
+        function App() {
+            // == MANEJO DE ESTADO ==
+            const [projects, setProjects] = useState(() => {
+                // *** PERSISTENCIA: Carga inicial desde localStorage ***
+                // Al iniciar, intenta leer los proyectos guardados.
+                // Si no hay nada, usa los datos de ejemplo.
+                try {
+                    const savedProjects = localStorage.getItem('impactEffortProjects');
+                    return savedProjects ? JSON.parse(savedProjects) : [
+                        { id: 1, name: 'Lanzar nuevo blog', effort: 3, impact: 8 },
+                        { id: 2, name: 'Rediseñar la web', effort: 9, impact: 9 },
+                        { id: 3, name: 'Optimizar SEO on-page', effort: 2, impact: 4 },
+                        { id: 4, name: 'Crear reportes manuales', effort: 7, impact: 2 },
+                    ];
+                } catch (error) {
+                    console.error("Error al cargar proyectos desde localStorage:", error);
+                    return []; // Devuelve un array vacío si hay un error
+                }
+            });
+
+            const [projectName, setProjectName] = useState('');
+            const [effort, setEffort] = useState(5);
+            const [impact, setImpact] = useState(5);
+            const [filter, setFilter] = useState('');
+            const [isSorted, setIsSorted] = useState(false);
+            const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+            const chartRef = useRef(null);
+            const chartInstanceRef = useRef(null);
+            const captureRef = useRef(null);
+            
+            // == EFECTOS SECUNDARIOS (SIDEEFFECTS) ==
+            // *** PERSISTENCIA: Guardado automático en localStorage ***
+            // Este efecto se ejecuta CADA VEZ que el array 'projects' cambia.
+            useEffect(() => {
+                localStorage.setItem('impactEffortProjects', JSON.stringify(projects));
+            }, [projects]);
+            
+            // Escucha cambios en el tamaño de la ventana para hacer el gráfico responsivo
+            useEffect(() => {
+                const handleResize = () => setWindowWidth(window.innerWidth);
+                window.addEventListener('resize', handleResize);
+                return () => window.removeEventListener('resize', handleResize);
+            }, []);
+
+            // Proyectos ordenados (memorizado para eficiencia)
+            const sortedProjects = useMemo(() => {
+                const projectsCopy = [...projects];
+                if (isSorted) {
+                    projectsCopy.sort((a, b) => b.impact - a.impact || a.effort - b.effort);
+                }
+                return projectsCopy;
+            }, [projects, isSorted]);
+            
+            const displayedProjects = useMemo(() => sortedProjects.filter(p => 
+                p.name.toLowerCase().includes(filter.toLowerCase())
+            ), [sortedProjects, filter]);
+
+            // Función para obtener opciones responsivas del gráfico
+            const getChartOptions = useCallback(() => {
+                const isMobile = windowWidth < 768;
+                const titleFontSize = isMobile ? 12 : 14;
+                const labelFontSize = isMobile ? 9 : 11;
+
+                return {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { min: 0, max: 10, title: { display: true, text: 'Esfuerzo →', font: {size: titleFontSize, weight: '600'} } },
+                        y: { min: 0, max: 10, title: { display: true, text: 'Impacto →', font: {size: titleFontSize, weight: '600'} } }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { enabled: true, callbacks: { label: (c) => `${c.raw.name}: (Esfuerzo: ${c.raw.x}, Impacto: ${c.raw.y})` } },
+                        datalabels: { align: 'end', anchor: 'end', offset: 8, backgroundColor: 'rgba(241, 245, 249, 0.8)', borderRadius: 4, color: 'rgb(30, 41, 59)', font: { size: labelFontSize, weight: '500' }, formatter: (v, c) => c.dataset.data[c.dataIndex].name, padding: { top: 4, bottom: 4, left: 6, right: 6 } },
+                        dragData: {
+                            round: 0.1,
+                            onDragEnd: (e, datasetIndex, index, value) => {
+                                const chartProject = chartInstanceRef.current.data.datasets[datasetIndex].data[index];
+                                if (!chartProject) return;
+                                const projectId = chartProject.id;
+                                setProjects(prev => prev.map(p => p.id === projectId ? { ...p, effort: Math.round(value.x*10)/10, impact: Math.round(value.y*10)/10 } : p));
+                            }
+                        }
+                    },
+                };
+            }, [windowWidth]);
+
+            // Crea y gestiona la instancia de Chart.js
+            useEffect(() => {
+                if (!chartRef.current) return;
+                if (chartInstanceRef.current) chartInstanceRef.current.destroy();
+
+                const ctx = chartRef.current.getContext('2d');
+                const data = {
+                    datasets: [{
+                        label: 'Proyectos',
+                        data: displayedProjects.map(p => ({ x: p.effort, y: p.impact, name: p.name, id: p.id })),
+                        backgroundColor: 'rgba(45, 55, 72, 0.8)',
+                        pointRadius: 8,
+                        pointHoverRadius: 10,
+                        pointBorderColor: 'white',
+                        pointBorderWidth: 2,
+                    }],
+                };
+                chartInstanceRef.current = new Chart(ctx, {
+                    type: 'scatter',
+                    data: data,
+                    plugins: [quadrantsPlugin, ChartDataLabels],
+                    options: getChartOptions()
+                });
+                return () => {
+                    if (chartInstanceRef.current) {
+                        chartInstanceRef.current.destroy();
+                        chartInstanceRef.current = null;
+                    }
+                };
+            }, [displayedProjects, getChartOptions]);
+
+            // == FUNCIONES AUXILIARES ==
+            const getQuadrantName = (project) => {
+                if (project.impact >= 5 && project.effort < 5) return "Quick Wins";
+                if (project.impact >= 5 && project.effort >= 5) return "Proyectos Estratégicos";
+                if (project.impact < 5 && project.effort < 5) return "Frutos Maduros";
+                if (project.impact < 5 && project.effort >= 5) return "Pérdidas de Tiempo";
+                return "Indefinido";
+            };
+
+            // == MANEJADORES DE EVENTOS ==
+            const handleAddProject = (e) => {
+                e.preventDefault();
+                if (!projectName.trim()) return;
+                setProjects([...projects, { id: Date.now(), name: projectName, effort: parseFloat(effort), impact: parseFloat(impact) }]);
+                setProjectName(''); setEffort(5); setImpact(5);
+            };
+
+            const handleDeleteProject = (idToDelete) => setProjects(projects.filter(p => p.id !== idToDelete));
+            
+            const handleSaveAsImage = () => {
+                if(captureRef.current) {
+                    html2canvas(captureRef.current, { useCORS: true, logging: false, scale: 2 }).then(canvas => {
+                        const link = document.createElement('a');
+                        link.download = 'matriz-impacto-esfuerzo.png';
+                        link.href = canvas.toDataURL('image/png');
+                        link.click();
+                    });
+                }
+            };
+            
+            const handleExportToCSV = () => {
+                const headers = ["Nombre del Proyecto", "Esfuerzo", "Impacto", "Cuadrante"];
+                const csvRows = [headers.join(',')];
+                sortedProjects.forEach(p => {
+                    const values = [`"${p.name.replace(/"/g, '""')}"`, p.effort, p.impact, getQuadrantName(p)];
+                    csvRows.push(values.join(','));
+                });
+                const csvString = csvRows.join('\n');
+                const blob = new Blob([`\uFEFF${csvString}`], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = 'proyectos_impacto_esfuerzo.csv';
+                link.click();
+            };
+
+            // == RENDERIZADO DEL COMPONENTE ==
+            return (
+                <div className="min-h-screen">
+                    <main id="capture-area" ref={captureRef} className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+                        <header className="text-center mb-6 sm:mb-8">
+                            <h1 className="text-3xl sm:text-4xl font-bold text-slate-900">Matriz Impacto-Esfuerzo</h1>
+                            <p className="mt-2 text-base sm:text-lg text-slate-600">Prioriza tus proyectos de forma visual e interactiva.</p>
+                        </header>
+                        
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
+                            <div className="lg:col-span-1 space-y-6 lg:space-y-8">
+                                <div className="bg-white p-5 sm:p-6 rounded-xl shadow-sm border border-slate-200">
+                                    <h2 className="text-xl font-bold mb-4 text-slate-800">Añadir Nuevo Proyecto</h2>
+                                    <form onSubmit={handleAddProject} className="space-y-4">
+                                        <div>
+                                            <label htmlFor="projectName" className="block text-sm font-medium text-slate-700">Nombre del Proyecto</label>
+                                            <input type="text" id="projectName" value={projectName} onChange={(e) => setProjectName(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-sm shadow-sm placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500" placeholder="Ej: Migrar a la nube" required />
+                                        </div>
+                                        <div>
+                                            <label htmlFor="impact" className="block text-sm font-medium text-slate-700">Impacto: <span className="font-bold text-blue-600">{impact}</span></label>
+                                            <input type="range" id="impact" min="0" max="10" step="0.1" value={impact} onChange={(e) => setImpact(e.target.value)} className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-500" />
+                                        </div>
+                                        <div>
+                                            <label htmlFor="effort" className="block text-sm font-medium text-slate-700">Esfuerzo: <span className="font-bold text-amber-600">{effort}</span></label>
+                                            <input type="range" id="effort" min="0" max="10" step="0.1" value={effort} onChange={(e) => setEffort(e.target.value)} className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-amber-500" />
+                                        </div>
+                                        <button type="submit" className="w-full bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200">Añadir Proyecto</button>
+                                    </form>
+                                </div>
+
+                                <div className="bg-white p-5 sm:p-6 rounded-xl shadow-sm border border-slate-200">
+                                    <h2 className="text-xl font-bold mb-4 text-slate-800">Acciones</h2>
+                                    <div className="space-y-3">
+                                        <button onClick={handleSaveAsImage} className="w-full flex items-center justify-center gap-2 bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700 transition-colors">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                                            Guardar como Imagen
+                                        </button>
+                                        <button onClick={handleExportToCSV} className="w-full flex items-center justify-center gap-2 bg-teal-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-teal-700 transition-colors">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                            Exportar a Excel (.csv)
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="bg-white p-5 sm:p-6 rounded-xl shadow-sm border border-slate-200">
+                                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-3">
+                                        <h2 className="text-xl font-bold text-slate-800">Lista de Proyectos</h2>
+                                        <label htmlFor="sort-toggle" className="flex items-center cursor-pointer self-start sm:self-center">
+                                            <span className="mr-2 text-sm font-medium text-slate-700">Ordenar por prioridad</span>
+                                            <div className="relative">
+                                                <input type="checkbox" id="sort-toggle" className="sr-only" checked={isSorted} onChange={() => setIsSorted(!isSorted)} />
+                                                <div className="block bg-slate-200 w-10 h-6 rounded-full"></div>
+                                                <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${isSorted ? 'transform translate-x-full bg-blue-600' : ''}`}></div>
+                                            </div>
+                                        </label>
+                                    </div>
+                                    <input type="text" placeholder="🔍 Filtrar por nombre..." value={filter} onChange={(e) => setFilter(e.target.value)} className="mb-4 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-sm shadow-sm" />
+                                    <ul className="space-y-3 max-h-60 overflow-y-auto pr-2">
+                                        {displayedProjects.length > 0 ? displayedProjects.map(p => (
+                                            <li key={p.id} className="flex justify-between items-center bg-slate-50 p-2 rounded-md">
+                                                <span className="text-sm font-medium text-slate-700 break-all pr-2">{p.name}</span>
+                                                <button onClick={() => handleDeleteProject(p.id)} className="text-slate-400 hover:text-red-500 transition-colors flex-shrink-0">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                </button>
+                                            </li>
+                                        )) : <p className="text-sm text-slate-500 text-center py-4">No hay proyectos. ¡Añade o ajusta tu filtro!</p>}
+                                    </ul>
+                                </div>
+                            </div>
+                            
+                            <div className="lg:col-span-2 bg-white p-2 sm:p-4 rounded-xl shadow-sm border border-slate-200">
+                                <div className="relative h-[65vh] sm:h-[70vh] lg:h-full w-full">
+                                    <canvas ref={chartRef}></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </main>
+                     <footer className="text-center mt-8 pb-8 px-4 text-sm text-slate-500">
+                        <p>Creado con React, Tailwind y Chart.js.</p>
+                        <p>Arrastra los puntos en el gráfico para actualizarlos.</p>
+                    </footer>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+
+    </script>
+
+</body>
+</html>
