@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Evaluación de Madurez de Procesos v2.0</title>
+    <!-- Librerías para PDF y Captura HTML -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Definición de una paleta de colores premium y estilos base */
+        :root {
+            --primary-color: #4f46e5; /* Indigo */
+            --primary-hover: #4338ca;
+            --secondary-color: #64748b; /* Slate */
+            --secondary-hover: #475569;
+            --background-color: #f8fafc; /* Slate 50 */
+            --card-background: #ffffff;
+            --text-primary: #1e293b; /* Slate 800 */
+            --text-secondary: #475569; /* Slate 600 */
+            --border-color: #e2e8f0; /* Slate 200 */
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-primary);
+        }
+
+        h1, h2, h3 {
+            font-family: 'Manrope', sans-serif;
+            font-weight: 800;
+        }
+
+        /* Clases para transiciones de vistas */
+        .view {
+            width: 100%;
+            transition: opacity 0.4s ease-in-out, transform 0.4s ease-in-out;
+        }
+        .view.hidden {
+            position: absolute;
+            opacity: 0;
+            transform: translateY(20px);
+            pointer-events: none;
+        }
+        
+        /* Estilos de botones personalizados */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            box-shadow: 0 1px 3px 0 rgba(0,0,0,0.1), 0 1px 2px 0 rgba(0,0,0,0.06);
+            border: 1px solid transparent;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+        }
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: var(--primary-hover);
+        }
+        .btn-secondary {
+            background-color: var(--card-background);
+            color: var(--secondary-color);
+            border-color: var(--border-color);
+        }
+        .btn-secondary:hover {
+            background-color: #f1f5f9; /* Slate 100 */
+            color: var(--text-primary);
+        }
+
+        /* Estilo de la tarjeta principal */
+        .card {
+            background-color: var(--card-background);
+            border-radius: 1rem;
+            padding: 2rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
+            border: 1px solid var(--border-color);
+            transition: all 0.3s ease-in-out;
+        }
+        
+        /* Barra de progreso */
+        #progress-bar-container {
+            width: 100%;
+            background-color: var(--border-color);
+            border-radius: 9999px;
+            height: 0.75rem;
+            overflow: hidden;
+        }
+        #progress-bar {
+            height: 100%;
+            width: 0%;
+            background-color: var(--primary-color);
+            border-radius: 9999px;
+            transition: width 0.4s ease-in-out;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container mx-auto p-4 md:p-6 max-w-4xl min-h-screen flex flex-col">
+        <header class="text-center py-6">
+            <h1 class="text-3xl md:text-4xl text-gray-900">Evaluación de Madurez de Procesos</h1>
+            <p class="text-lg text-gray-500 mt-1">Descubre oportunidades de mejora con un análisis profesional.</p>
+        </header>
+
+        <main id="app" class="flex-grow relative">
+            <!-- Pantalla de Inicio -->
+            <div id="view-start" class="view">
+                <div class="card text-center">
+                    <h2 class="text-2xl font-bold mb-4">Bienvenido</h2>
+                    <p class="mb-8 text-lg text-slate-600">Comienza una nueva evaluación para identificar la madurez de un proceso y obtener un plan de acción para mejorarlo.</p>
+                    <button id="btn-new-assessment" class="btn btn-primary text-lg">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+                        Iniciar Nueva Evaluación
+                    </button>
+                </div>
+            </div>
+
+            <!-- Pantalla para ingresar el nombre -->
+            <div id="view-name" class="view hidden">
+                <div class="card max-w-xl mx-auto">
+                    <h2 class="text-2xl font-bold mb-4 text-center">1. Identificar el Proceso</h2>
+                    <p class="mb-6 text-slate-600 text-center">Define el proceso que vas a analizar. Sé específico para obtener mejores resultados.</p>
+                    <form id="form-process-name">
+                        <input type="text" id="input-process-name" placeholder='Ej: "Incorporación de nuevos clientes"' class="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-6" required>
+                        <div class="flex justify-between items-center">
+                             <button type="button" id="btn-cancel-name" class="btn btn-secondary">Cancelar</button>
+                             <button type="submit" class="btn btn-primary">Siguiente</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Pantalla de la Evaluación -->
+            <div id="view-assessment" class="view hidden">
+                <div class="card">
+                    <h2 class="text-2xl font-bold mb-1">Evaluando: <span id="assessment-process-name" class="text-indigo-600"></span></h2>
+                    <p class="mb-4 text-slate-600">Responde honestamente a cada pregunta para obtener un diagnóstico preciso.</p>
+                    
+                    <div id="progress-bar-container" class="my-6">
+                        <div id="progress-bar"></div>
+                    </div>
+
+                    <form id="form-assessment">
+                        <div id="questions-container" class="space-y-8"></div>
+                        <div class="mt-8 pt-6 border-t border-slate-200 flex justify-between items-center">
+                            <button type="button" id="btn-cancel-assessment" class="btn btn-secondary">Cancelar</button>
+                            <button type="submit" class="btn btn-primary">Calcular Resultado</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Pantalla de Resultados -->
+            <div id="view-results" class="view hidden">
+                <div id="results-content" class="card">
+                     <h2 class="text-3xl font-bold mb-6 text-center">📊 Resultado de la Evaluación</h2>
+                     <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-4 mb-6">
+                        <p class="text-lg"><strong>Proceso:</strong> <span id="result-process-name" class="font-semibold text-indigo-800"></span></p>
+                     </div>
+                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                        <div class="bg-slate-100 p-6 rounded-xl text-center">
+                            <p class="text-lg font-semibold text-slate-700">Puntaje Obtenido</p>
+                            <p id="result-score" class="text-6xl font-extrabold text-indigo-600 my-2"></p>
+                            <p class="text-slate-500">de 27 puntos posibles</p>
+                        </div>
+                        <div class="bg-slate-100 p-6 rounded-xl text-center">
+                            <p class="text-lg font-semibold text-slate-700">Nivel de Madurez</p>
+                            <p id="result-level-name" class="text-4xl font-extrabold text-indigo-600 my-2"></p>
+                            <p id="result-level-description" class="text-slate-500"></p>
+                        </div>
+                     </div>
+
+                     <!-- Sección de Recomendaciones -->
+                     <div id="recommendations-section">
+                        <h3 class="text-2xl font-bold mb-4 text-center">💡 Plan de Acción para la Mejora</h3>
+                        <p class="text-center text-slate-600 mb-6">Estos son los puntos clave en los que debes enfocarte para elevar el nivel de madurez de tu proceso.</p>
+                        <ul id="recommendations-list" class="space-y-3 list-inside">
+                           <!-- Las recomendaciones se insertarán aquí -->
+                        </ul>
+                     </div>
+                </div>
+                <div class="mt-6 text-center space-x-4">
+                    <button id="btn-export-pdf" class="btn btn-primary">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20"><path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" /><path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" /></svg>
+                        Exportar Informe PDF
+                    </button>
+                    <button id="btn-back-to-start" class="btn btn-secondary">Evaluar Otro Proceso</button>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- Historial de Evaluaciones -->
+        <footer id="past-assessments-container" class="mt-12 pb-8">
+             <h3 class="text-2xl font-bold mb-4 text-center">Historial de Evaluaciones</h3>
+             <div id="past-assessments-list" class="space-y-3 max-w-3xl mx-auto">
+                <!-- Los elementos del historial se insertan aquí -->
+             </div>
+        </footer>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // --- CONSTANTES DE DATOS ---
+        const assessmentData = [
+            { level: 1, title: 'Proceso Emergente', questions: ['¿El proceso se realiza sin documentación formal?', '¿Depende de la memoria o experiencia del operador?', '¿No existen reglas claras para ejecutar el proceso?'] },
+            { level: 2, title: 'Proceso No Estandarizado', questions: ['¿Las tareas se repiten, pero cada persona las realiza a su manera?', '¿Hay frecuentes inconsistencias o errores?', '¿No existen procedimientos definidos?'] },
+            { level: 3, title: 'Proceso Rutinario', questions: ['¿Las tareas se realizan regularmente?', '¿Hay algo de consistencia, pero aún no existe un marco formal?', '¿Los procedimientos varían entre personas?'] },
+            { level: 4, title: 'Proceso Estandarizado', questions: ['¿Existen procedimientos claros y documentados?', '¿Todos los empleados siguen el mismo método?', '¿Se reducen errores gracias a la documentación?'] },
+            { level: 5, title: 'Proceso Conectado', questions: ['¿Se utilizan herramientas tecnológicas para gestionar el proceso?', '¿Se conectan diferentes áreas a través de estas herramientas?', '¿Aún se necesita intervención humana en varias etapas?'] },
+            { level: 6, title: 'Proceso Digitalizado', questions: ['¿Existen sistemas digitales para automatizar partes del proceso?', '¿Se ha reducido el error humano gracias a la digitalización?', '¿Mejoró la eficiencia por el uso de herramientas digitales?'] },
+            { level: 7, title: 'Proceso Optimizado', questions: ['¿Se analizan datos para mejorar el proceso?', '¿Se han eliminado pasos innecesarios?', '¿Existe una cultura de mejora continua?'] },
+            { level: 8, title: 'Proceso Automatizado', questions: ['¿La mayoría de las tareas están automatizadas?', '¿La intervención humana es mínima?', '¿La automatización incrementó velocidad y consistencia?'] },
+            { level: 9, title: 'Proceso Inteligente', questions: ['¿El proceso utiliza inteligencia artificial o aprendizaje automático?', '¿Se adapta automáticamente a los cambios del entorno?', '¿Se optimiza continuamente sin intervención humana?'] }
+        ];
+
+        const scoreLevels = [
+            { min: 0, max: 3, name: 'Nivel 1: Emergente', desc: 'El proceso es impredecible y poco controlado.' },
+            { min: 4, max: 6, name: 'Nivel 2: No Estandarizado', desc: 'El proceso se realiza, pero de forma inconsistente.' },
+            { min: 7, max: 9, name: 'Nivel 3: Rutinario', desc: 'El proceso es repetible pero depende de las personas.' },
+            { min: 10, max: 12, name: 'Nivel 4: Estandarizado', desc: 'El proceso está definido y documentado.' },
+            { min: 13, max: 15, name: 'Nivel 5: Conectado', desc: 'El proceso se apoya en tecnología para la gestión.' },
+            { min: 16, max: 18, name: 'Nivel 6: Digitalizado', desc: 'Partes clave del proceso son automáticas y eficientes.' },
+            { min: 19, max: 21, name: 'Nivel 7: Optimizado', desc: 'El proceso se gestiona y mejora con base en datos.' },
+            { min: 22, max: 24, name: 'Nivel 8: Automatizado', desc: 'El proceso se ejecuta con mínima intervención humana.' },
+            { min: 25, max: 27, name: 'Nivel 9: Inteligente', desc: 'El proceso se adapta y optimiza de forma autónoma.' }
+        ];
+
+        // --- REFERENCIAS AL DOM ---
+        const views = document.querySelectorAll('.view');
+        const btnNewAssessment = document.getElementById('btn-new-assessment');
+        const btnCancelName = document.getElementById('btn-cancel-name');
+        const btnCancelAssessment = document.getElementById('btn-cancel-assessment');
+        const btnExportPDF = document.getElementById('btn-export-pdf');
+        const btnBackToStart = document.getElementById('btn-back-to-start');
+        
+        const formProcessName = document.getElementById('form-process-name');
+        const inputProcessName = document.getElementById('input-process-name');
+        const formAssessment = document.getElementById('form-assessment');
+        const questionsContainer = document.getElementById('questions-container');
+        const assessmentProcessName = document.getElementById('assessment-process-name');
+        
+        const resultsContent = document.getElementById('results-content');
+        const resultProcessName = document.getElementById('result-process-name');
+        const resultScore = document.getElementById('result-score');
+        const resultLevelName = document.getElementById('result-level-name');
+        const resultLevelDescription = document.getElementById('result-level-description');
+        const recommendationsList = document.getElementById('recommendations-list');
+        
+        const pastAssessmentsContainer = document.getElementById('past-assessments-container');
+        const pastAssessmentsList = document.getElementById('past-assessments-list');
+
+        const progressBar = document.getElementById('progress-bar');
+
+        // --- ESTADO DE LA APLICACIÓN ---
+        let currentResult = null;
+        let assessments = [];
+
+        // --- LÓGICA DE NAVEGACIÓN ---
+        const showView = (viewId) => {
+            views.forEach(view => {
+                if (view.id === viewId) {
+                    view.classList.remove('hidden');
+                } else {
+                    view.classList.add('hidden');
+                }
+            });
+            window.scrollTo(0, 0);
+        };
+
+        const goToStart = () => {
+            showView('view-start');
+            loadPastAssessments();
+        };
+
+        // --- LÓGICA PRINCIPAL ---
+        btnNewAssessment.addEventListener('click', () => {
+            inputProcessName.value = '';
+            showView('view-name');
+            inputProcessName.focus();
+        });
+
+        [btnCancelName, btnCancelAssessment, btnBackToStart].forEach(btn => {
+            btn.addEventListener('click', goToStart);
+        });
+        
+        formProcessName.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const processName = inputProcessName.value.trim();
+            if (processName) {
+                currentResult = { name: processName };
+                renderAssessmentForm();
+                showView('view-assessment');
+            }
+        });
+        
+        const renderAssessmentForm = () => {
+            assessmentProcessName.textContent = currentResult.name;
+            questionsContainer.innerHTML = '';
+            let totalQuestions = 0;
+
+            assessmentData.sort((a,b) => a.level - b.level).forEach((level, levelIndex) => {
+                const levelDiv = document.createElement('div');
+                levelDiv.className = 'p-5 border rounded-lg bg-slate-50';
+                let questionsHtml = `<h3 class="text-lg font-bold mb-4 text-slate-800">Nivel ${level.level}: ${level.title}</h3>`;
+                
+                level.questions.forEach((question, questionIndex) => {
+                    const questionId = `q_${levelIndex}_${questionIndex}`;
+                    totalQuestions++;
+                    questionsHtml += `
+                        <div class="mb-4 p-3 border-l-4 border-slate-200 transition-all hover:border-indigo-400">
+                            <p class="mb-2 text-slate-700" data-question-text="${question}">${question}</p>
+                            <div class="flex items-center space-x-6">
+                                <label class="flex items-center cursor-pointer text-base">
+                                    <input type="radio" name="${questionId}" value="1" class="mr-2 h-4 w-4 text-indigo-600 focus:ring-indigo-500" required> Sí
+                                </label>
+                                <label class="flex items-center cursor-pointer text-base">
+                                    <input type="radio" name="${questionId}" value="0" class="mr-2 h-4 w-4 text-indigo-600 focus:ring-indigo-500" required> No
+                                </label>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                levelDiv.innerHTML = questionsHtml;
+                questionsContainer.appendChild(levelDiv);
+            });
+            formAssessment.dataset.totalQuestions = totalQuestions;
+            updateProgressBar();
+        };
+
+        formAssessment.addEventListener('change', updateProgressBar);
+        
+        function updateProgressBar() {
+            const total = parseInt(formAssessment.dataset.totalQuestions, 10);
+            if (!total) return;
+            const answered = formAssessment.querySelectorAll('input[type="radio"]:checked').length;
+            const percentage = (answered / total) * 100;
+            progressBar.style.width = `${percentage}%`;
+        }
+        
+        formAssessment.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const formData = new FormData(formAssessment);
+            let totalScore = 0;
+            let recommendations = [];
+
+            formData.forEach((value, key) => {
+                const isYes = parseInt(value, 10) === 1;
+                totalScore += (isYes ? 1 : 0);
+                if (!isYes) {
+                    const questionElement = formAssessment.querySelector(`input[name="${key}"]`).closest('div.mb-4').querySelector('p[data-question-text]');
+                    const questionText = questionElement.dataset.questionText;
+                    recommendations.push(generateRecommendationText(questionText));
+                }
+            });
+            
+            const resultLevel = scoreLevels.find(level => totalScore >= level.min && totalScore <= level.max);
+            
+            currentResult = {
+                ...currentResult,
+                id: Date.now(),
+                score: totalScore,
+                levelName: resultLevel.name,
+                levelDescription: resultLevel.desc,
+                recommendations: recommendations,
+                date: new Date().toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })
+            };
+
+            displayResults(currentResult);
+            saveAssessment(currentResult);
+            showView('view-results');
+        });
+
+        function generateRecommendationText(question) {
+            return "Trabajar en: " + question
+                .replace('¿', '')
+                .replace('?', '')
+                .replace(/^./, str => str.toUpperCase()) + '.';
+        }
+        
+        function displayResults(result) {
+            currentResult = result;
+            resultProcessName.textContent = result.name;
+            resultScore.textContent = result.score;
+            resultLevelName.textContent = result.levelName;
+            resultLevelDescription.textContent = result.levelDescription;
+            
+            recommendationsList.innerHTML = '';
+            if (result.recommendations && result.recommendations.length > 0) {
+                document.getElementById('recommendations-section').style.display = 'block';
+                result.recommendations.forEach(rec => {
+                    const li = document.createElement('li');
+                    li.className = "flex items-start p-3 bg-slate-50 rounded-md"
+                    li.innerHTML = `<svg class="h-6 w-6 text-indigo-500 mr-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg><span>${rec}</span>`;
+                    recommendationsList.appendChild(li);
+                });
+            } else {
+                 document.getElementById('recommendations-section').style.display = 'none';
+            }
+        }
+
+        // --- GESTIÓN DE DATOS ---
+        const saveAssessment = (result) => {
+            assessments.push(result);
+            localStorage.setItem('processAssessments', JSON.stringify(assessments));
+        };
+        
+        const loadPastAssessments = () => {
+            assessments = JSON.parse(localStorage.getItem('processAssessments') || '[]');
+            renderPastAssessmentsList();
+        };
+        
+        const renderPastAssessmentsList = () => {
+            pastAssessmentsContainer.style.display = assessments.length > 0 ? 'block' : 'none';
+            pastAssessmentsList.innerHTML = assessments.length === 0 ? '<p class="text-center text-slate-500">No hay evaluaciones guardadas.</p>' : '';
+            
+            const fullDateFormatter = new Intl.DateTimeFormat('es-ES', { dateStyle: 'long', timeStyle: 'short' });
+
+            assessments.slice().reverse().forEach(assessment => {
+                const displayDate = assessment.id ? fullDateFormatter.format(new Date(assessment.id)) : 'Fecha no disponible';
+
+                const item = document.createElement('div');
+                item.className = 'card !p-4 flex justify-between items-center cursor-pointer hover:shadow-lg hover:border-indigo-300';
+                item.innerHTML = `
+                    <div>
+                        <p class="font-bold text-indigo-700">${assessment.name}</p>
+                        <p class="text-sm text-slate-500">
+                            ${displayDate} &bull; <strong class="text-slate-600">${assessment.levelName}</strong> (${assessment.score} pts)
+                        </p>
+                    </div>
+                    <button class="btn btn-secondary !p-2" data-id="${assessment.id}">
+                       <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd" /></svg>
+                    </button>
+                `;
+                item.querySelector('div').addEventListener('click', () => {
+                    displayResults(assessment);
+                    showView('view-results');
+                });
+                item.querySelector('button').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    deleteAssessment(assessment.id);
+                });
+                pastAssessmentsList.appendChild(item);
+            });
+        };
+
+        const deleteAssessment = (id) => {
+            assessments = assessments.filter(a => a.id !== id);
+            localStorage.setItem('processAssessments', JSON.stringify(assessments));
+            loadPastAssessments();
+        };
+
+        // --- EXPORTACIÓN A PDF (LÓGICA html2canvas) ---
+        btnExportPDF.addEventListener('click', () => {
+            const { jsPDF } = window.jspdf;
+            const resultsContent = document.getElementById('results-content');
+            const pdfName = `Informe_Madurez_${currentResult.name.replace(/\s+/g, '_')}.pdf`;
+
+            // Ocultar temporalmente los botones para que no salgan en la captura
+            const buttonsContainer = document.querySelector('#view-results .mt-6');
+            buttonsContainer.style.display = 'none';
+
+            // Usar html2canvas para capturar el div de resultados
+            html2canvas(resultsContent, {
+                scale: 2, // Aumentar la escala para una mejor resolución en el PDF
+                useCORS: true,
+                backgroundColor: '#ffffff' // Asegurar un fondo blanco
+            }).then(canvas => {
+                // Volver a mostrar los botones una vez hecha la captura
+                buttonsContainer.style.display = 'block';
+
+                const doc = new jsPDF('p', 'mm', 'a4');
+                const margin = 10;
+                const docWidth = doc.internal.pageSize.getWidth();
+                const docHeight = doc.internal.pageSize.getHeight();
+                
+                const imgData = canvas.toDataURL('image/png');
+                const imgProps = doc.getImageProperties(imgData);
+                
+                const pdfWidth = docWidth - (margin * 2);
+                const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+                
+                let positionY = margin;
+                
+                // Verificar si la altura del contenido excede la de una página
+                if (pdfHeight > (docHeight - (margin*2) - 20)) { // 20 para el footer
+                    // En este caso, se podría escalar para que quepa, pero puede verse muy pequeño.
+                    // La opción más simple es añadirlo tal cual, aceptando que se corte si es muy largo.
+                    // Para una solución real, se necesitaría un renderizado manual más complejo.
+                    // Por ahora, lo ajustamos al alto de la página.
+                    doc.addImage(imgData, 'PNG', margin, positionY, pdfWidth, docHeight - (margin*2) - 20);
+                } else {
+                    doc.addImage(imgData, 'PNG', margin, positionY, pdfWidth, pdfHeight);
+                }
+                
+                // --- Añadir pie de página ---
+                const footerY = docHeight - 15;
+                const primaryColor = '#4f46e5';
+                const secondaryTextColor = '#64748b';
+                
+                doc.setFillColor('#f8fafc');
+                doc.rect(0, docHeight - 20, docWidth, 20, 'F');
+                doc.setFontSize(9).setTextColor(secondaryTextColor);
+                doc.text(`Informe confidencial | ${currentResult.date}`, margin, footerY);
+                doc.setTextColor(primaryColor);
+                doc.textWithLink('www.sevenreasoons.com', (docWidth / 2), footerY, { align: 'center', url: 'http://www.sevenreasoons.com' });
+                doc.setTextColor(secondaryTextColor);
+                doc.text(`Página 1 de 1`, docWidth - margin, footerY, { align: 'right' });
+
+                doc.save(pdfName);
+            });
+        });
+
+        // --- INICIALIZACIÓN ---
+        goToStart();
+    });
+    </script>
+</body>
+</html>
