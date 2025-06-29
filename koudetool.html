@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Koude Music Tool</title>
+    <title>Herramienta Musical con Compositor</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <!-- PDF Libraries -->
@@ -55,6 +55,18 @@
             justify-content: center;
             z-index: 50;
         }
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 4px solid #fbbf24;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body class="text-white antialiased">
@@ -64,7 +76,7 @@
         <!-- ===== COMPOSER VIEW (MAIN) ===== -->
         <div id="composer-view" class="view">
             <header class="text-center mb-8">
-                <h1 class="text-4xl md:text-5xl font-bold text-amber-400">Koude Music Tool</h1>
+                <h1 class="text-4xl md:text-5xl font-bold text-amber-400">Compositor Musical</h1>
                 <p class="text-lg text-gray-400 mt-2">Crea, guarda y exporta tus ideas musicales.</p>
             </header>
 
@@ -102,6 +114,9 @@
                     <!-- Composition notes will appear here -->
                 </div>
                 <div class="flex justify-center items-center space-x-4">
+                     <button id="analyze-melody-button" class="bg-indigo-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-indigo-700 transition-colors duration-300 hidden">
+                        ✨ Analizar Melodía
+                    </button>
                     <button id="save-composition-button" class="bg-emerald-500 text-white font-bold py-2 px-5 rounded-lg hover:bg-emerald-600 transition-colors duration-300">
                         Guardar Composición
                     </button>
@@ -151,7 +166,7 @@
         </div>
     </div>
 
-    <!-- Save Composition Modal -->
+    <!-- Modals -->
     <div id="save-modal" class="modal-overlay hidden">
         <div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-md">
             <h3 class="text-2xl font-bold text-white mb-4">Guardar Composición</h3>
@@ -163,6 +178,19 @@
             </div>
         </div>
     </div>
+    
+    <div id="analysis-modal" class="modal-overlay hidden">
+         <div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+            <h3 class="text-2xl font-bold text-white mb-4">✨ Análisis de la Melodía</h3>
+            <div id="analysis-content" class="text-gray-300 overflow-y-auto pr-4">
+                <!-- Analysis content will be injected here -->
+            </div>
+            <div class="text-right mt-6">
+                <button id="close-analysis-button" class="bg-amber-500 text-gray-900 font-bold py-2 px-5 rounded-lg hover:bg-amber-600 transition-colors">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
@@ -215,6 +243,7 @@
                 const compositionOutput = document.getElementById('composition-output');
                 const clearCompositionButton = document.getElementById('clear-composition-button');
                 const saveCompositionButton = document.getElementById('save-composition-button');
+                const analyzeMelodyButton = document.getElementById('analyze-melody-button');
                 const savedCompositionsList = document.getElementById('saved-compositions-list');
                 const exportPdfButton = document.getElementById('export-pdf-button');
                 const composerView = document.getElementById('composer-view');
@@ -223,6 +252,9 @@
                 const showComposerButtonFromTheory = document.getElementById('show-composer-button-from-theory');
                 const theoryTonicDisplay = document.getElementById('theory-tonic-display');
                 const saveModal = document.getElementById('save-modal');
+                const analysisModal = document.getElementById('analysis-modal');
+                const analysisContent = document.getElementById('analysis-content');
+                const closeAnalysisButton = document.getElementById('close-analysis-button');
                 const compositionNameInput = document.getElementById('composition-name-input');
                 const cancelSaveButton = document.getElementById('cancel-save-button');
                 const confirmSaveButton = document.getElementById('confirm-save-button');
@@ -249,8 +281,11 @@
 
                 function renderCurrentComposition() {
                     compositionOutput.innerHTML = '';
-                    saveCompositionButton.disabled = currentComposition.length === 0;
-                    if (currentComposition.length === 0) {
+                    const hasComposition = currentComposition.length > 0;
+                    saveCompositionButton.disabled = !hasComposition;
+                    analyzeMelodyButton.classList.toggle('hidden', !hasComposition);
+
+                    if (!hasComposition) {
                         compositionOutput.innerHTML = '<p class="text-gray-500 text-center">Añade notas aquí...</p>';
                         return;
                     }
@@ -295,15 +330,16 @@
                 
                 function handleTonicSelection(note) {
                     activeTonic = note;
-                    activeScaleKey = null; // Reset scale choice
+                    activeScaleKey = null;
                     document.querySelectorAll('#tonic-selector .note-button').forEach(btn => btn.classList.remove('active'));
                     document.querySelector(`#tonic-selector .note-button[data-note="${note}"]`).classList.add('active');
                     
                     showTheoryButton.disabled = false;
-                    composerCreatorArea.classList.add('hidden'); // Hide composer until scale is chosen
+                    composerCreatorArea.classList.add('hidden');
                     scaleSelectorArea.classList.remove('hidden');
+                    document.querySelectorAll('#scale-selector .scale-button').forEach(btn => btn.classList.remove('active'));
 
-                    updateTheoryUI(note); // Update the full theory page
+                    updateTheoryUI(note);
                 }
 
                 function handleScaleSelection(scaleKey) {
@@ -316,9 +352,44 @@
                     scaleHelperDisplay.textContent = `Escala de ${activeTonic} ${SCALE_DEFINITIONS[scaleKey].name}: ${compositionScaleNotes.join(' - ')}`;
                     composerCreatorArea.classList.remove('hidden');
 
-                    currentComposition = []; // Clear previous melody on new scale selection
+                    currentComposition = [];
                     renderCurrentComposition();
                 }
+                
+                async function handleAnalysisClick() {
+                    if (currentComposition.length === 0) return;
+
+                    analysisContent.innerHTML = '<div class="flex justify-center items-center h-full"><div class="spinner"></div></div>';
+                    analysisModal.classList.remove('hidden');
+
+                    const prompt = `Analiza la siguiente melodía desde una perspectiva de teoría musical. Sé breve, constructivo y ofrece sugerencias.
+                    - Tonalidad: ${activeTonic} ${SCALE_DEFINITIONS[activeScaleKey].name}
+                    - Notas de la escala: ${compositionScaleNotes.join(', ')}
+                    - Melodía compuesta: ${currentComposition.join(', ')}`;
+                    
+                    try {
+                        let chatHistory = [{ role: "user", parts: [{ text: prompt }] }];
+                        const payload = { contents: chatHistory };
+                        const apiKey = ""; 
+                        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+                        const response = await fetch(apiUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        const result = await response.json();
+                        if (result.candidates && result.candidates[0].content.parts[0].text) {
+                            const analysisText = result.candidates[0].content.parts[0].text.replace(/\n/g, '<br>');
+                            analysisContent.innerHTML = `<p>${analysisText}</p>`;
+                        } else {
+                            analysisContent.textContent = "No se pudo obtener un análisis. Inténtalo de nuevo.";
+                        }
+                    } catch (error) {
+                        console.error("Error fetching analysis:", error);
+                        analysisContent.textContent = "Ocurrió un error al contactar al servicio de análisis. Revisa la consola para más detalles.";
+                    }
+                }
+
 
                 // --- EVENT LISTENERS & SETUP ---
                 NOTES.forEach(note => {
@@ -367,6 +438,9 @@
                     currentComposition = [];
                     renderCurrentComposition();
                 });
+
+                analyzeMelodyButton.addEventListener('click', handleAnalysisClick);
+                closeAnalysisButton.addEventListener('click', () => analysisModal.classList.add('hidden'));
 
                 saveCompositionButton.addEventListener('click', () => {
                     if (currentComposition.length > 0) {
